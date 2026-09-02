@@ -51,7 +51,7 @@ void servo_vertical_angulo_tempo(int ang, int t){
 
 //teste de ldr e de motores
 //testaremos a leitura do ldr e os ângulos dos motores
-/*
+
 int main(void){
 
     // Configura os motores
@@ -70,9 +70,9 @@ int main(void){
     }
 
     printk("ADC pronto. Entrando no loop de leitura.\n");
-*/
+
 /*TESTE 1, MOTORES OK MAS LDR NÃO*/
-/*
+
     while(1){
         //teste de motores horizontais
         for(int angulo = 0; angulo <= 180; angulo += 10){
@@ -99,7 +99,7 @@ int main(void){
             k_msleep(500);
         }
     }
-        */
+
        /*Teste 2: LDR
        SUCESSO
        while(1){
@@ -108,13 +108,13 @@ int main(void){
             k_msleep(500);
         }*/
             
-   // return 0;
+   return 0;
 
-//}
+}
 
 //resultado do teste: o servo trava com 160 graus. pra evitar autodestruição, fiz uma regra de 3 para que 180 vire 160, perdendo precisão, mas ganhando longevidade
 //função principal
-
+/*
 int main(void){
 
     // Configura os motores
@@ -237,4 +237,4 @@ int main(void){
     
     return 0;
 }
-    
+    */
