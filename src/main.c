@@ -3,6 +3,8 @@ pwm do horizontal = ptd3
 pwm do vertical = ptd0
 ldr da direita no canal ptb2
 ldr da esquerda no canal ptb0
+ldr de cima a decidir 
+ldr de baixo a decidir
 em angulo_incidencia_solar.c preencha dia mes ano latitude etc
 em init_hora.c coloque hora, minuto segundo
 */
@@ -13,7 +15,9 @@ em init_hora.c coloque hora, minuto segundo
 #include <pwm_z42.h>                // Biblioteca personalizada com funções de controle do TPM (Timer/PWM Module)
 #include <ldr.h>
 #include <init_hora.h>              // Biblioteca do relógio de software
-#include "angulo_incidencia_solar.h" // Biblioteca matemática para Zênite e Azimute
+#include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
+#include <servo_angulo_tempo.h>
+#include <testes.h>
 
 // Para um clock de 48 MHz e prescaler de 128 (PS_128), a frequência do timer é 375 kHz.
 // Para um período de 20ms (50Hz), TPM_MODULE (MOD) deve ser 7500.
@@ -24,97 +28,8 @@ em init_hora.c coloque hora, minuto segundo
 #define INPUT_PORT DT_NODELABEL(gpiod)
 #define INPUT_PIN 20
 
-//aparentemente a cada 180 que peço para esse ir ele só move 90. por isso vou dobrar o angulo no código
-void servo_horizontal_angulo_tempo(int ang, int t){
-    while(ang>180){
-        ang-=180;
-    }
-    while(ang<0){
-        ang+=180;
-    }
-    // 375 é o offset para 1ms (0 graus), (750-375) = variação para até 2ms (180 graus)
-    pwm_tpm_CnV(TPM0, 3, (375 +(1.21*ang * 375 / 180))); //1a correcao: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 //segunda correcao: multiplico denovo por 140/180 -> 1,21
-    k_msleep((int)(1000 * t));
-}
 
-void servo_vertical_angulo_tempo(int ang, int t){
-    while(ang>180){
-        ang-=180;
-    }
-    while(ang<0){
-        ang+=180;
-    }
-    // 375 é o offset para 1ms (0 graus), (750-375) = variação para até 2ms (180 graus)
-    pwm_tpm_CnV(TPM0, 0, (375 + (1.47*ang * 375 / 180))); //1a correção: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 // 2a correcao: multiplico por 170/180 -> 1,555*170/180 = 1,47
-    k_msleep((int)(1000 * t));
-}
-
-//teste de ldr e de motores
-//testaremos a leitura do ldr e os ângulos dos motores
-
-int main(void){
-
-    // Configura os motores
-    pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
-    pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
-    pwm_tpm_Ch_Init(TPM0, 0, TPM_PWM_H, GPIOD, 0);
-
-    //configura o ldr
-    printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
-
-    // Inicializa o hardware do ADC
-    if (ldr_inicializar() < 0)  //configura o ldr
-    {
-        printk("Falha critica na inicializacao do ADC. Parando.\n");
-        return -1;
-    }
-
-    printk("ADC pronto. Entrando no loop de leitura.\n");
-
-/*TESTE 1, MOTORES OK MAS LDR NÃO*/
-
-    while(1){
-        //teste de motores horizontais
-        for(int angulo = 0; angulo <= 180; angulo += 10){
-            servo_horizontal_angulo_tempo(angulo, 1);
-            printk("Angulo horizontal: %d\n", angulo);
-        }
-        for(int angulo = 180; angulo >= 0; angulo -= 10){
-            servo_horizontal_angulo_tempo(angulo, 1);
-            printk("Angulo horizontal: %d\n", angulo);
-        }
-        //teste de motores verticais
-        for(int angulo = 0; angulo <= 180; angulo += 10){
-            servo_vertical_angulo_tempo(angulo, 1);
-            printk("Angulo vertical: %d\n", angulo);
-        }
-        for(int angulo = 180; angulo >= 0; angulo -= 10){
-            servo_vertical_angulo_tempo(angulo, 1);
-            printk("Angulo vertical: %d\n", angulo);
-        }
-        //teste de ldr
-        for(int i = 0; i < 20; i++){
-            printk("LDR direito: %f\n", ldr_ler('d'));
-            printk("LDR esquerdo: %f\n", ldr_ler('e'));
-            k_msleep(500);
-        }
-    }
-
-       /*Teste 2: LDR
-       SUCESSO
-       while(1){
-            printk("LDR direito: %f\n", ldr_ler('d'));
-            printk("LDR esquerdo: %f\n", ldr_ler('e'));
-            k_msleep(500);
-        }*/
-            
-   return 0;
-
-}
-
-//resultado do teste: o servo trava com 160 graus. pra evitar autodestruição, fiz uma regra de 3 para que 180 vire 160, perdendo precisão, mas ganhando longevidade
 //função principal
-/*
 int main(void){
 
     // Configura os motores
@@ -149,6 +64,13 @@ int main(void){
     servo_horizontal_angulo_tempo(angulo, 1);
     servo_vertical_angulo_tempo(angulo, 1);
     int contador_vertical = 0;
+
+    //teste motores
+    teste_motores();
+    //teste ldr
+    teste_ldr();
+
+    printk("Testes terminados, começando o tracker...");
 
     while(1){
         relogio_atualizar(); // Mantém o relógio preciso atualizando as variáveis globais hora_atual, etc.
@@ -237,4 +159,3 @@ int main(void){
     
     return 0;
 }
-    */
