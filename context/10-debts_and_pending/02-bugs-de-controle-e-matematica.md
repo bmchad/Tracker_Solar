@@ -236,6 +236,50 @@ tem de ser o sensor. Ver
 
 ---
 
+## D-19 — `ADC_REF_INTERNAL` faz `adc_raw_to_millivolts_dt()` devolver 0 mV **com sucesso**
+
+**Onde:** `zephyr/frdm_kl25z.overlay` (os nós de canal) mais o consumidor a ser escrito em
+`lib/ldr/ldr.c`. É uma armadilha que **entra junto com a correção do D-03**, não um bug do código
+atual — o código de hoje não usa a função.
+
+⛔ **Severidade alta pelo sintoma:** os quatro sensores leem **0 mV**, os dois erros ficam sempre
+zero, a zona morta nunca é excedida e **o tracker não se move** — sem erro, sem log, com todas as
+chamadas retornando sucesso. Na tela é indistinguível de "está escuro".
+
+A cadeia, verificada no framework em disco:
+
+1. `adc_raw_to_millivolts_dt` escolhe a origem da referência pelo campo do devicetree
+   (`include/zephyr/drivers/adc.h`):
+   ```c
+   if (channel_cfg->reference == ADC_REF_INTERNAL) {
+       vref_mv = (int32_t)adc_ref_internal(spec->dev);
+   } else {
+       vref_mv = spec->vref_mv;   /* = DT_PROP_OR(node, zephyr_vref_mv, 0) */
+   }
+   ```
+2. `adc_ref_internal()` devolve o campo `ref_internal` da API do driver. E
+   **`adc_mcux_adc16.c` nunca preenche esse campo** — `grep ref_internal` no arquivo não retorna
+   nada, enquanto dezenas de outros drivers de ADC do Zephyr preenchem. Fica **0**.
+3. A conversão então faz, silenciosamente:
+   ```c
+   int32_t adc_mv = *valp * ref_mv;         /* ref_mv = 0  ->  0 */
+   int ret = adc_gain_invert(gain, &adc_mv); /* ADC_GAIN_1 -> SUCESSO, 0 intacto */
+   *valp = (adc_mv >> resolution);           /* 0 */
+   return ret;                               /* 0 = SUCESSO */
+   ```
+
+**Correção:** nos **quatro** nós de canal, `zephyr,vref-mv = <3300>;` e `zephyr,reference` diferente
+de `ADC_REF_INTERNAL` (`"ADC_REF_EXTERNAL0"` é honesto, porque VREFH *é* pino de referência
+externa). Seguro porque `mcux_adc16_channel_setup` **ignora** `channel_cfg->reference` — valida
+canal, tempo de aquisição, diferencial e ganho, e nada mais; a referência de hardware vem de Kconfig
+(`ADC_MCUX_ADC16_VREF_DEFAULT` → VREFH/VREFL). Ver
+[../02-software_specs/01-devicetree-adc-4-canais.md](../02-software_specs/01-devicetree-adc-4-canais.md).
+
+⭐ **Alternativa que não pode falhar em silêncio:** `mv = (raw * 3300) / 4096` à mão. Perde o
+devicetree como fonte da escala, mas é imune a esta classe de erro.
+
+---
+
 ## D-18 — Comentário do overlay chama pino externo de canal interno
 
 **Onde:** `zephyr/frdm_kl25z.overlay`, nos dois nós de canal.

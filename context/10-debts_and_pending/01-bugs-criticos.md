@@ -87,6 +87,11 @@ milivolts**. É um número adimensional, não calibrável contra nenhuma mediç�
 devicetree. Ver
 [../02-software_specs/02-api-ldr-4-sensores.md](../02-software_specs/02-api-ldr-4-sensores.md).
 
+⛔ **Leia o D-19 antes de escrever essa linha.** Com o overlay como está
+(`zephyr,reference = "ADC_REF_INTERNAL"`), essa função devolve **0 mV com código de sucesso** neste
+driver, e o tracker para de se mexer sem reclamar. A correção do D-03 é **par indivisível** com a
+correção do overlay do D-19 — aplicar uma sozinha é pior que não aplicar nenhuma.
+
 ---
 
 ## D-04 — `acos`/`asin` sem clamp de domínio: NaN, e depois UB

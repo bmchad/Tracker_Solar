@@ -86,9 +86,28 @@ O que se confirma aqui, e só aqui:
 - os limites de curso param onde devem (nada de wrap — D-05 corrigido);
 - **qual sentido aumenta o ângulo** — é o que preenche `SENTIDO_SERVO` e
   `AZIMUTE_DO_SERVO_ZERO` de [04-eixo-vertical-feedforward.md](04-eixo-vertical-feedforward.md);
-- **P-02, e este é o teste que a responde:** com o passo 1 ainda imprimindo, girar um servo. Se as
-  quatro leituras de LDR se mexerem juntas quando o motor gira, a referência do ADC está afundando
-  e os servos precisam de fonte separada. Nenhum ajuste de software conserta isso.
+- **o teste de acoplamento**, abaixo — é ele que responde **P-02** e **P-10**.
+
+#### ⭐ O teste de 3 passos: separa problema elétrico de problema de algoritmo
+
+Com o `teste_ldr_4()` imprimindo os quatro valores **e os dois erros**, em sequência:
+
+| # | Estado | O que se espera | O que significa se falhar |
+|---|---|---|---|
+| a | servo **desligado** | valores estáveis; anote o espalhamento | é o **offset estático** — resistores (1% ≈ 8 mV) e dispersão dos LDRs |
+| b | servo **energizado e parado** | nada muda em relação a (a) | ruído de repouso da fonte |
+| c | servo **girando** | ⭐ `erro_h` e `erro_v` **não se movem** | se movem: **acoplamento por GND** (**P-10**), não algoritmo |
+
+Só o passo (c) responde a pergunta que importa, e é a diferença entre fechar **P-02** sem comprar
+nada e descobrir que precisa de fonte externa (**DEC-11**).
+
+⚠️ **Olhe os ERROS, não os valores.** Se os quatro valores caem **juntos**, a subtração cancela e
+está tudo bem — é o modo comum, e ele é esperado. O que condena é `erro_h` ou `erro_v` se mexer,
+porque isso é a parcela **diferencial**, que nada no algoritmo cobre.
+
+⛔ E um sintoma que não aparece nos números: se o **MCU resetar** ou a serial cair durante (c), é
+o `P5V_USB` afundando abaixo do dropout do LDO de 3,3 V. Isso não é erro de leitura e nenhuma
+subtração o cancela — vai direto para fonte externa.
 
 ### Passo 3 — malha fechada de um eixo
 

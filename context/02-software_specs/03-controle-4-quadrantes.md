@@ -126,6 +126,31 @@ controle. Limites em
 [../03-hardware_specs/03-atuadores-sg90s.md](../03-hardware_specs/03-atuadores-sg90s.md), e o
 vertical depende de **P-06**.
 
+## Quando amostrar: no fim da espera, nunca durante o movimento
+
+⭐ **Regra, e ela é dona deste fato** (a spec de servo referencia daqui):
+
+> A leitura acontece no **fim** da espera de assentamento, nunca no começo, e o que for lido
+> enquanto o servo se move é **descartado** — não entra no histórico da mediana.
+
+Duas razões independentes, e a segunda vale mesmo se a alimentação dos servos mudar:
+
+1. **Elétrica.** A janela em que o servo se move é a **única** em que a corrente de servo circula,
+   logo a única em que o acoplamento por GND existe (**DEC-11**, **P-10**). Amostrar fora dela torna
+   o problema irrelevante **de graça** — não precisa de capacitor, de fonte nova nem de limiar mais
+   alto.
+2. **De controle.** Ruído correlacionado com a **própria ação** do laço é realimentação, e é assim
+   que nasce oscilação auto-sustentada. Ruído aleatório não faz isso; ruído que aparece sempre
+   *depois* de "decidi mover" faz. E ler durante o movimento mede uma posição que ainda está
+   mudando — o valor não corresponde a ângulo nenhum.
+
+Encaixa na separação `servo_ir()` / espera de
+[05-camada-servo-e-calibracao.md](05-camada-servo-e-calibracao.md): quem orquestra comanda os dois
+eixos, espera o **maior** dos dois movimentos, e **só então** chama `ldr_ler_todos()`.
+
+⭐ Isso é o que faz o período de amostragem ficar **regular**, que é o que **D-14** cobra de fato —
+não basta encurtar a espera, ela precisa ser sempre a mesma em relação ao instante da leitura.
+
 ## A interface do módulo
 
 ```c

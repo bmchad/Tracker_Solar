@@ -3,8 +3,9 @@ pwm do horizontal = ptd3
 pwm do vertical = ptd0
 ldr da direita no canal ptb2
 ldr da esquerda no canal ptb0
-ldr de cima a decidir 
-ldr de baixo a decidir
+ldr de cima no canal ptb1
+ldr de baixo no canal ptb3
+os quatro ldr sao ptb0..ptb3 = A0..A3, contiguos no header arduino
 em angulo_incidencia_solar.c preencha dia mes ano latitude etc
 em init_hora.c coloque hora, minuto segundo
 */

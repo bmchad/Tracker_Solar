@@ -23,14 +23,25 @@ referenciam daqui. Se um fio mudar, mude aqui.
 |---|---|---|---|---|
 | PWM horizontal (azimute) | **PTD3** | `TPM0` canal 3 | `MUX(4)` | `src/main.c:37`, `lib/servo_motor/` |
 | PWM vertical (inclinação) | **PTD0** | `TPM0` canal 0 | `MUX(4)` | `src/main.c:38`, `lib/servo_motor/` |
-| LDR esquerda | **PTB0** | `ADC0_SE8` | analógico | overlay, nó `channel@8` |
-| LDR direita | **PTB2** | `ADC0_SE12` | analógico | overlay, nó `channel@c` |
-| LDR cima | **A DEFINIR** — sugestão PTB1 | `ADC0_SE9` | analógico | **P-01** |
-| LDR baixo | **A DEFINIR** — sugestão PTB3 | `ADC0_SE13` | analógico | **P-01** |
+| LDR esquerda | **PTB0** = `A0` | `ADC0_SE8` | analógico | overlay, nó `channel@8` |
+| LDR direita | **PTB2** = `A2` | `ADC0_SE12` | analógico | overlay, nó `channel@c` |
+| LDR cima | **PTB1** = `A1` | `ADC0_SE9` | analógico | overlay, nó `channel@9` |
+| LDR baixo | **PTB3** = `A3` | `ADC0_SE13` | analógico | overlay, nó `channel@d` |
 
-A sugestão PTB1/PTB3 é por serem os vizinhos diretos dos dois já usados, contíguos no header J10 e
-livres no projeto atual. A alternativa avaliada foi PTC1 (`SE15`) / PTC2 (`SE11`), também livres.
-A escolha é de montagem física, não de software — ver **P-01**.
+⭐ **Os quatro LDRs ficam em `A0`, `A1`, `A2`, `A3` — quatro pinos contíguos no mesmo header
+Arduino.** Isso não é coincidência feliz, é o critério que fechou a escolha (**DEC-12**): fio
+analógico curto e agrupado é o que a estrela de **DEC-10** e os 100 nF por entrada pedem, e é a
+defesa contra o acoplamento capacitivo do PWM que **P-10** mede.
+
+O mapa `PTB0..PTB3 → A0..A3` está no nó `arduino_header` de
+`boards/nxp/frdm_kl25z/frdm_kl25z.dts`. A alternativa avaliada e recusada foi PTC1 (`SE15`) /
+PTC2 (`SE11`), que são `A4`/`A5` — livres e válidos, mas quebram a contiguidade.
+
+⚠️ **Os quatro pads são compartilhados com o TSI0** (touch): `TSI0_CH0/CH6/CH7/CH8` ocupam
+exatamente PTB0/PTB1/PTB2/PTB3, e no **mesmo** `MUX(0)` das funções de ADC. Em Kinetis `MUX(0)` é
+"pino desabilitado (analógico)", e entrega o pad a qualquer bloco analógico que o reivindique — não
+existe mux que escolha entre ADC e TSI. Não há conflito hoje porque o `prj.conf` não habilita TSI;
+habilitar touch algum dia disputaria estes pinos.
 
 ⚠️ Os dois eixos compartilham o **mesmo TPM** (`TPM0`), logo compartilham prescaler e `MOD`, logo
 compartilham **período**. Isso está certo para servos (ambos querem 50 Hz), mas significa que

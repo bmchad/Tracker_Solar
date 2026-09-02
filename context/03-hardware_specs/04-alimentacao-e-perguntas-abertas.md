@@ -6,28 +6,33 @@ com o arquivo e a linha a tocar quando a resposta chegar.
 
 ---
 
-## P-02 — De onde sai a alimentação dos servos?
+## P-02 — O acoplamento servo→LDR pela rede de GND é tolerável?
 
 ⭐ **É a pergunta mais importante desta página, e ela não é sobre os motores — é sobre os
 sensores.**
 
-Dois SG90 em movimento puxam **mais de 1 A de pico**, e mais ainda em stall (empurrando contra um
-batente). O regulador da FRDM-KL25Z não entrega isso.
+**Decidido (DEC-11):** os servos **ficam no `P5V_USB` da placa**, com três mitigações — capacitor
+de bulk de 470–1000 µF no servo, estrela no GND com pinos de GND separados para servo e LDRs, e não
+amostrar durante o movimento. A pergunta que resta é se isso basta, e o critério de fechamento é
+uma **medição**: o teste de 3 passos de
+[../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md).
 
-O modo de falha não é o óbvio. Se os servos saem do 3,3 V ou do 5 V da placa, cada movimento
-**afunda o VDD** — e o ADC usa `ADC_REF_INTERNAL`, que na KL25Z **é o próprio VDD**. Então:
+Dois SG90 em movimento puxam **mais de 1 A de pico**, e mais ainda em stall. Uma porta USB 2.0
+entrega 500 mA, e o **LDO de 3,3 V da placa é alimentado desse mesmo 5 V** — então o pico não é só
+ruído: pode resetar o MCU (**D-17** → relógio volta a 15:00, **D-06** → 12 min de varredura).
 
-> Quando o motor gira, a referência do ADC cai, e **as quatro leituras de LDR caem juntas** sem que
-> a luz tenha mudado.
+⭐ **A boa notícia, e é por isso que a espera é razoável:** a medição é **ratiométrica**. O 3,3 V que
+excita os divisores é o mesmo que chega a VREFH, então ele se cancela na razão `Vdivisor/Vref` e o
+código bruto é imune, em primeira ordem, a queda do rail. Somado a isso, servo no 5 V e divisor no
+3,3 V já separam o lado da alimentação — o único condutor compartilhado é o **GND**.
 
-O erro é uma **diferença**, então uma queda proporcional nos quatro tende a se cancelar — mas só
-tende: os quatro canais são amostrados em instantes diferentes, dentro do transiente. O resultado
-é ruído correlacionado com o próprio movimento, que é exatamente a receita de oscilação
-auto-sustentada. E é indistinguível, no log, de um problema de algoritmo.
+⛔ **O que sobra, e mantém a pendência:** a parcela **diferencial** da queda IR no GND (**P-10**),
+que não cancela porque queda IR ao longo de um condutor é gradiente e não offset. Detalhe completo
+em [../10-debts_and_pending/05-pendencias-de-hardware.md](../10-debts_and_pending/05-pendencias-de-hardware.md).
 
-**Resposta necessária:** fonte externa para os servos, com **terra comum** com a placa. Se já é o
-caso, registrar aqui e fechar P-02 — porque enquanto isso não estiver escrito, todo ajuste de zona
-morta está tentando compensar um problema elétrico em software.
+**Se o teste falhar:** fonte externa, escolhida por **ESR** e não capacidade — power bank USB 5 V ou
+4× AA NiMH; alcalina 6 V tem quase 1 Ω e cai ~1 V a 1 A. ⛔ E nunca terra flutuante: o PWM é tensão
+referida ao terra.
 
 ---
 
@@ -60,12 +65,12 @@ da terceira linha. Sem essas medições, os valores da spec de controle são chu
 
 ---
 
-## P-01 — Quais pinos analógicos para os dois LDRs novos?
+## ~~P-01 — Quais pinos analógicos para os dois LDRs novos?~~ ✅ resolvido
 
-Sugestão PTB1 (`ADC0_SE9`) e PTB3 (`ADC0_SE13`); alternativa PTC1 (`SE15`) e PTC2 (`SE11`).
-Ver a tabela em [01-plataforma-e-pinagem.md](01-plataforma-e-pinagem.md). É decisão de montagem —
-o software tem um ponto único de troca, descrito em
-[../02-software_specs/01-devicetree-adc-4-canais.md](../02-software_specs/01-devicetree-adc-4-canais.md).
+**PTB1 (`A1`) para o de cima, PTB3 (`A3`) para o de baixo** — os quatro LDRs em `A0`–`A3`,
+contíguos. Deixou de ser pergunta aberta; a tabela em
+[01-plataforma-e-pinagem.md](01-plataforma-e-pinagem.md) é dona do fato, e o critério está em
+**DEC-12**.
 
 ---
 

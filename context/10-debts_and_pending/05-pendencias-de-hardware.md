@@ -8,41 +8,107 @@ Todo `A DEFINIR` espalhado pelo `context/` tem um `P-nn` aqui.
 
 ---
 
-## P-01 — Quais pinos ADC para os dois LDRs novos?
+## P-01 — Quais pinos ADC para os dois LDRs novos? ✅ RESOLVIDO (2026-09-02)
 
-**Sugestão:** PTB1 (`ADC0_SE9`) e PTB3 (`ADC0_SE13`) — vizinhos diretos dos dois já usados,
-contíguos no header J10, livres no projeto. **Alternativa:** PTC1 (`SE15`) e PTC2 (`SE11`).
+**Resposta: PTB1 (`ADC0_SE9`) para o LDR de cima, PTB3 (`ADC0_SE13`) para o de baixo.** A tabela de
+pinagem é dona do fato:
+[../03-hardware_specs/01-plataforma-e-pinagem.md](../03-hardware_specs/01-plataforma-e-pinagem.md).
+O critério da escolha está em **DEC-12**.
 
-**Quando responder, tocar:**
+Conferido nas fontes em disco, não de memória:
 
-| Arquivo | O que |
+| Verificação | Onde |
 |---|---|
-| `zephyr/frdm_kl25z.overlay` | os dois `reg =`, os dois nomes de nó `channel@N`, e os dois números em `io-channels` |
-| `context/03-hardware_specs/01-plataforma-e-pinagem.md` | as duas últimas linhas da tabela |
+| `ADC0_SE9_PTB1` e `ADC0_SE13_PTB3` existem no package que a placa usa (MKL25Z128VLK4) | `hal/nxp/dts/nxp/kinetis/MKL25Z128VLK4-pinctrl.h:75,85` |
+| `PTB0..PTB3 → A0..A3`, quatro pinos contíguos no header Arduino | `boards/nxp/frdm_kl25z/frdm_kl25z.dts`, nó `arduino_header` |
+| Nada na placa disputa PTB1/PTB3 — LED RGB em PTB18/PTB19, I2C0 da placa em PTE24/PTE25 | mesmo dts, e `frdm_kl25z-pinctrl.dtsi` |
 
-⭐ **Nenhum arquivo `.c` muda** — `lib/ldr/` acessa por índice (`ADC_DT_SPEC_GET_BY_IDX`), não por
-número de canal. É por isso que o enum casa com a **posição** na lista e não com o canal do ADC.
-Ver [../02-software_specs/01-devicetree-adc-4-canais.md](../02-software_specs/01-devicetree-adc-4-canais.md).
+⭐ **A verificação rendeu um bônus:** as quatro funções de ADC são `KINETIS_MUX('B',n,0)` — ou seja,
+`MUX(0)`. Isso **prova** a premissa que a spec do overlay antes só inferia: analógico é o default de
+reset do Kinetis, e é por isso que PTB0 funciona hoje sem estar no grupo `adc0_default`. Ver
+[../02-software_specs/01-devicetree-adc-4-canais.md](../02-software_specs/01-devicetree-adc-4-canais.md).
+
+⚠️ **Ressalva que fica aberta como risco, não como pendência:** os quatro pads são compartilhados
+com o **TSI0** (`TSI0_CH0/CH6/CH7/CH8`), no mesmo `MUX(0)`. Não há mux que escolha entre ADC e
+touch — quem fica com o pad é o bloco analógico habilitado. Hoje o `prj.conf` não habilita TSI;
+habilitar touch disputaria estes pinos.
+
+**Recusado:** PTC1 (`SE15`) / PTC2 (`SE11`), que são `A4`/`A5`. Livres e válidos, mas quebram a
+contiguidade — ver DEC-12.
 
 ---
 
-## P-02 — De onde sai a alimentação dos servos?
+## P-02 — O acoplamento servo→LDR pela rede de GND é tolerável?
 
 ⭐ **A mais importante da lista, e ela é sobre os sensores, não sobre os motores.**
 
-`ADC_REF_INTERNAL` na KL25Z é o próprio VDD. Se os servos saem da placa, cada movimento afunda o
-VDD e **as quatro leituras caem juntas** sem a luz ter mudado — ruído correlacionado com o próprio
-movimento, indistinguível de um problema de algoritmo no log.
+Os servos **ficam no `P5V_USB` da placa por decisão** (**DEC-11**), não por omissão, com as três
+mitigações de lá. A pergunta que resta é estreita e tem critério de fechamento **mecânico**:
 
-**Como medir:** é o passo 2 do bringup. Com as leituras de LDR imprimindo, girar um servo e olhar se
-os quatro valores se mexem.
+> Com o `teste_ldr_4()` imprimindo, **`erro_h` ou `erro_v` se movem quando um servo gira?**
 
-**Quando responder:**
+- **Não se movem** → fecha P-02, sem fonte externa, com a medição anexada aqui.
+- **Se movem** → a fonte externa entra por DEC-11, com evidência em vez de precaução.
 
-- se **fonte externa com terra comum** → registrar em `03-hardware_specs/04` e fechar;
-- se **alimentado pela placa** → é mudança de hardware, e nenhum ajuste de software a compensa.
-  Enquanto não mudar, todo valor de `ZONA_MORTA_MV` está compensando um problema elétrico, e isso
-  precisa estar escrito ao lado da constante.
+### O que já se sabe, e é bom saber
+
+⭐ **A medição é ratiométrica.** O `ADC_REF_INTERNAL` da KL25Z é o par VREFH/VREFL, que na placa vai
+ao mesmo rail de 3,3 V que excita os divisores. Então:
+
+```
+código = (Vdivisor / Vref) × 4095
+       = (3,3 × R/(R+R_ldr)) / 3,3 × 4095
+       = R/(R+R_ldr) × 4095          ← o 3,3 V desaparece
+```
+
+O 3,3 V **se cancela na razão**: o código bruto é imune, em primeira ordem, a queda do rail. Não é
+só "tende a cancelar na subtração" — ele nem se move. Somado a isso, o servo no 5 V e o divisor no
+3,3 V já separam o lado da alimentação: a corrente de servo **não circula no rail de 3,3 V**.
+
+### O que não cancela, e é por isso que a pendência continua aberta
+
+1. ⭐ **A parcela diferencial da queda IR no GND** — o único condutor compartilhado. Ver **P-10**.
+   É o mecanismo principal, e nenhuma das defesas do algoritmo o cobre.
+2. **O transiente.** VDDA/VREFH é ligado ao 3,3 V por um filtro (bead + capacitores) na Freedom,
+   então numa borda rápida ele **não acompanha** o VDD e a razão quebra justo no arranque do servo.
+   ⚠️ Não conferido no esquemático da revisão de placa — é conhecimento geral de Freedom.
+3. **O valor em mV convertido**, que usa o 3,3 V **nominal** do devicetree, não o real. Fator comum
+   aos quatro, então não muda o sinal do erro; muda a escala em que a zona morta é comparada.
+4. **Reset do MCU no pico.** `P5V_USB` é upstream do LDO de 3,3 V; 1 A numa porta de 500 mA pode
+   derrubar o MCU (**D-17** → relógio em 15:00, **D-06** → 12 min de varredura) ou o OpenSDA.
+   Nenhuma razão de tensões cancela um reboot.
+
+**Quando fechar, tocar:** esta seção com a medição, e `03-hardware_specs/04`.
+
+---
+
+## P-10 — Quanta queda IR **diferencial** o trilho de GND introduz?
+
+⛔ **O mecanismo que o cancelamento por subtração não cobre**, e a razão de P-02 seguir aberta.
+
+O cancelamento exige que a perturbação seja **igual** nos dois sensores comparados. Mas a
+perturbação é queda IR **ao longo** de um condutor — e isso é, por definição, um **gradiente**: cada
+ponto do trilho está num potencial diferente. Não existe "deslocamento uniforme de terra" saindo de
+resistência distribuída conduzindo corrente; o mecanismo que cria o distúrbio é o mesmo que garante
+que parte dele seja **diferencial**.
+
+Os quatro LDRs estão em quatro pontos físicos distintos do trilho:
+
+> 1 A de pico do servo × ~50 mΩ entre dois LDRs = **50 mV diferenciais**, contra
+> `ZONA_MORTA_MV = 30`
+
+⚠️ **Esses 50 mV são cálculo, não medida da sua bancada** — resistência típica de contato de
+protoboard é de dezenas de mΩ, e trilho gasto chega a ohms. A ordem de grandeza é o que importa: é
+maior que a zona morta.
+
+**Como medir:** passo 3 do bringup, o teste de 3 passos de P-02.
+
+**Mitigações já decididas em DEC-11:** capacitor de bulk no servo (ataca na fonte, reduzindo o
+degrau de corrente), estrela no GND com pinos de GND separados para servo e LDRs, e não amostrar
+durante o movimento.
+
+**Quando responder, tocar:** esta seção com a medida, e a `ZONA_MORTA_MV` em `lib/controle/`
+se sobrar resíduo que precise ser absorvido pelo limiar.
 
 ---
 

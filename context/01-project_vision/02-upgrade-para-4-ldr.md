@@ -18,7 +18,7 @@ uma medida de erro, não uma posição. Esse é o bug **D-11**, e é o mais caro
 
 | Área | Antes | Depois |
 |---|---|---|
-| Canais de ADC | 2 (`SE12`, `SE8`) | 4 (mais dois, **P-01**) |
+| Canais de ADC | 2 (`SE12`, `SE8`) | 4 — mais `SE9` (PTB1) e `SE13` (PTB3), **DEC-12** |
 | API de leitura | `ldr_ler(char lado)` | `ldr_ler(ldr_id_t)` + `ldr_ler_todos()` |
 | Unidade da leitura | contagem bruta × 0,889 (D-03) | milivolts de verdade |
 | Filtro | votação quadrática, 25 pares (D-10) | mediana de 5 por sensor |

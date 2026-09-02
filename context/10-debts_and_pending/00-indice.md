@@ -5,6 +5,11 @@ do `zephyr/frdm_kl25z.overlay`, do `prj.conf`, do `CMakeLists.txt` e do `platfor
 2026-09-02. **O projeto não foi compilado nem executado nesta varredura** — são bugs de
 **inspeção**, não de observação. Onde há incerteza, está dito no item.
 
+O **D-19** e a parte verificada do **P-02** vêm de uma segunda passada, também em 2026-09-02, lendo
+o framework do Zephyr em `~/.platformio/packages/framework-zephyr` (driver `adc_mcux_adc16`,
+`Kconfig.mcux`, `include/zephyr/drivers/adc.h` e a dts/pinctrl da placa). Essas conclusões são
+leitura de fonte, não memória — os arquivos e as linhas estão citados nos itens.
+
 Os IDs são **estáveis**: as specs de [../02-software_specs/](../02-software_specs/) citam por ID e
 não redescrevem o bug. Não renumere; itens resolvidos ficam com o status mudado.
 
@@ -30,6 +35,7 @@ não redescrevem o bug. Não renumere; itens resolvidos ficam com o status mudad
 | **D-16** | Dia do ano aproximado, e **literais octais** na data | 🟡 média | [02](02-bugs-de-controle-e-matematica.md) | aberto |
 | **D-17** | Relógio sem data, e volta a uma hora fixa a cada boot | 🟠 alta | [02](02-bugs-de-controle-e-matematica.md) | aberto |
 | **D-18** | Comentário do overlay chama pino externo de canal interno | 🟢 baixa | [02](02-bugs-de-controle-e-matematica.md) | aberto |
+| **D-19** | `ADC_REF_INTERNAL` faz `adc_raw_to_millivolts_dt()` devolver 0 mV **com sucesso** | 🔴 alta | [02](02-bugs-de-controle-e-matematica.md) | aberto |
 | **D-20** | Validação de pino usa `\|\|` onde queria `&&`: inócua | 🟡 média | [03](03-bugs-na-lib-pwm-vendorizada.md) | **não corrigir** |
 | **D-21** | Ramo `GPIOC` configura o registrador e depois falha | 🟡 média | [03](03-bugs-na-lib-pwm-vendorizada.md) | **não corrigir** |
 | **D-30** | `lib/servo_motor/` e `lib/testes/` **untracked** | 🔴 crítica | [04](04-dividas-de-projeto-e-repositorio.md) | aberto |
@@ -47,8 +53,8 @@ Todas em [05-pendencias-de-hardware.md](05-pendencias-de-hardware.md).
 
 | ID | Pergunta | Bloqueia |
 |---|---|---|
-| **P-01** | Quais pinos ADC para os 2 LDRs novos? | o overlay |
-| **P-02** | De onde sai a alimentação dos servos? | ⭐ a confiabilidade de **toda** leitura de LDR |
+| ~~**P-01**~~ | ~~Quais pinos ADC para os 2 LDRs novos?~~ | ✅ **resolvido**: PTB1 (`SE9`) e PTB3 (`SE13`) |
+| **P-02** | O acoplamento servo→LDR pela rede de GND é tolerável? | ⭐ a confiabilidade de **toda** leitura de LDR |
 | **P-03** | Divisor é pull-up ou pull-down, e com que resistor? | ⭐ o **sinal** do erro |
 | **P-04** | Faixa real de mV dos LDRs no local? | a calibração de zona morta e ganho |
 | **P-05** | Altura da aleta do X? | o ganho óptico da malha |
@@ -56,6 +62,7 @@ Todas em [05-pendencias-de-hardware.md](05-pendencias-de-hardware.md).
 | **P-07** | Painel fotovoltaico real ou chapa? | torque, inércia, e o que "funciona" quer dizer |
 | **P-08** | Qual a faixa real de pulso do SG90S? | trocar os fatores empíricos por medição |
 | **P-09** | Para onde aponta o servo horizontal em 0°? | ⭐ traduzir ângulo de servo em azimute do céu |
+| **P-10** | Quanta queda IR **diferencial** o trilho de GND introduz? | ⭐ o mecanismo que a subtração não cobre |
 
 ## Se você só vai consertar três coisas
 
@@ -65,3 +72,8 @@ Todas em [05-pendencias-de-hardware.md](05-pendencias-de-hardware.md).
    produto não fazer o que promete.
 3. **D-06** — 12 minutos de boot. É o que impede qualquer iteração rápida em bancada, e portanto
    atrasa a correção de todos os outros.
+
+⛔ **E leia o D-19 antes de encostar no D-03.** A correção óbvia do D-03
+(`adc_raw_to_millivolts_dt()`) devolve **0 mV com código de sucesso** com o overlay como está — o
+tracker para de se mexer e não reclama. É a única armadilha desta lista que **entra junto com uma
+correção**, em vez de já estar no código.

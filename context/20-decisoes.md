@@ -169,3 +169,89 @@ pendência tem `P-nn`, e as specs citam pelo ID sem redescrever.
 **Motivo:** é como documentação apodrece. O mesmo número em dois lugares envelhece em um deles, e
 quem lê o desatualizado não tem como saber. Com dono único, corrigir é um lugar — e a verificação é
 mecânica: `grep` pelos IDs e pelos `A DEFINIR` fecha o ciclo.
+
+---
+
+## DEC-10 — Os quatro LDRs num único 3,3 V e num único GND
+
+**2026-09-02.** Um rail de 3,3 V, um GND, ligação em **estrela**.
+
+**Rejeitado:** separar em dois pinos de 3,3 V, com esquerda+cima num e direita+baixo no outro.
+
+**Motivo, duplo.** Os pinos `P3V3` da placa são o **mesmo net** (há um regulador só), então não
+haveria isolamento nenhum — seriam dois fios se encontrando 2 cm depois, dentro da PCB. E **se
+houvesse**, aquele agrupamento cruzaria os dois pares comparados: uma queda de modo comum num rail
+viraria **falso movimento diagonal do sol**, nos dois eixos ao mesmo tempo, indistinguível de um sol
+real se movendo. Com um rail só, a perturbação é comum aos dois membros de cada par e morre na
+subtração. Detalhe e números em
+[03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md](03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md).
+
+---
+
+## DEC-11 — Mitigar o acoplamento por GND e medir, antes de trocar de fonte
+
+**2026-09-02.** Os servos **seguem no `P5V_USB` da placa**, compartilhando a rede de GND. Três
+medidas entram junto, e nenhuma é perdida se a fonte externa vier depois:
+
+1. **470–1000 µF eletrolítico + 100 nF** nos pinos de alimentação do servo — o servo passa a tirar
+   o degrau de corrente do capacitor local em vez de puxar pelo fio que vem da placa, o que reduz a
+   componente comum **e** a diferencial. É a de maior efeito;
+2. **estrela no GND** — retorno dos servos num pino de GND da placa, estrela dos LDRs num pino
+   **diferente**. A junção passa a acontecer no plano interno (miliohms) e não num trilho de
+   protoboard;
+3. **não amostrar durante o movimento** — ver
+   [02-software_specs/03-controle-4-quadrantes.md](02-software_specs/03-controle-4-quadrantes.md).
+   Grátis, e elimina a janela em que a corrente circula.
+
+**Rejeitado — fonte externa desde já.** O argumento que sustenta a espera é o do usuário, e ele
+está correto na parte principal: com servo no 5 V e divisor no 3,3 V, **o lado da alimentação já
+está separado** — a corrente de servo não circula no rail de 3,3 V. Toda a questão se reduz ao
+**GND**, o único condutor compartilhado. E lá o cancelamento é real: deslocamento comum aos quatro
+morre na subtração, somado ao efeito ratiométrico (**P-02**). É por isso que a montagem de 2 LDRs
+funciona hoje. Vale registrar a concessão junto: como `ldr_ler_todos()` faz as quatro conversões
+encostadas (~150 µs, contra transiente de servo que evolui em milissegundos), a
+**não-simultaneidade das amostras é resíduo, não o problema principal**.
+
+⛔ **Onde o argumento fura**, e é o que mantém **P-02** e **P-10** abertos: queda IR ao longo de um
+condutor é **gradiente, não offset**. Não existe deslocamento uniforme saindo de resistência
+distribuída conduzindo corrente — cada um dos quatro pontos do trilho está num potencial diferente,
+e essa parcela é **diferencial** e não cancela. E o `P5V_USB` é **upstream do LDO de 3,3 V**: 1 A de
+pico numa porta de 500 mA pode resetar o MCU (**D-17** → relógio volta a 15:00; **D-06** → 12 min de
+varredura) ou derrubar a conexão do OpenSDA. Reset não é erro de leitura, e nenhuma subtração
+cancela um reboot.
+
+⛔ **Rejeitado em qualquer cenário: terra flutuante.** O PWM é tensão referida ao terra; sem retorno
+comum o servo não interpreta o pulso, e os dois lados acumulam tensão de modo comum. "Isolar" aqui
+significa **rail de alimentação separado com terra compartilhado num ponto só** — nunca terra
+separado.
+
+**Se o teste de 3 passos falhar**, a fonte externa entra com evidência, e a escolha é por **ESR**,
+não capacidade: power bank USB 5 V (5 V é o meio da faixa do SG90, ESR baixa, 2 A comuns) ou
+4× AA NiMH (~0,15 Ω no conjunto). Alcalina 6 V tem quase 1 Ω e cai ~1 V a 1 A — evitar.
+
+---
+
+## DEC-12 — Os dois LDRs novos em PTB1 e PTB3, por contiguidade
+
+**2026-09-02.** LDR de cima em **PTB1** (`ADC0_SE9`), de baixo em **PTB3** (`ADC0_SE13`). Fecha o
+**P-01**.
+
+**Rejeitado:** PTC1 (`ADC0_SE15`) e PTC2 (`ADC0_SE11`). Estão livres, são canais válidos do `adc0`, e
+funcionariam sem nenhuma diferença de software.
+
+**Motivo — é físico, não elétrico.** Com PTB1/PTB3, os quatro LDRs caem em **`A0`, `A1`, `A2`, `A3`**:
+quatro pinos contíguos no mesmo header Arduino, com os dois já usados (PTB0 = A0, PTB2 = A2) no
+meio deles. PTC1/PTC2 são `A4`/`A5` e espalhariam os quatro sensores por dois blocos do header.
+
+Isso importa porque os fios analógicos são o elo frágil da montagem: o divisor de 10 kΩ tem
+impedância de fonte de ~5 kΩ, e em protoboard eles correm ao lado dos fios de PWM e de potência do
+servo. Quatro pinos juntos significam **quatro fios curtos e agrupados**, que é o que a topologia em
+estrela de **DEC-10** e os 100 nF por entrada de **P-10** pedem para funcionar. Espalhar os
+sensores por dois blocos alonga fio sem ganhar nada.
+
+**O que a verificação rendeu de brinde:** as quatro funções de ADC são `KINETIS_MUX('B',n,0)` no
+header do fabricante, o que **prova** que analógico é o `MUX(0)` de reset — premissa que a spec do
+overlay antes só inferia. E a ressalva que veio junto: os mesmos pads são canais de **TSI0**, no
+mesmo `MUX(0)`, então ADC e touch disputam o pad sem mux que os separe. Sem conflito hoje (o
+`prj.conf` não habilita TSI), registrado em
+[03-hardware_specs/01-plataforma-e-pinagem.md](03-hardware_specs/01-plataforma-e-pinagem.md).

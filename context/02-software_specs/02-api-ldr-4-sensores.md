@@ -98,21 +98,40 @@ Consequência prática, e é ela que importa: a `margem = 20.0` do `main.c`, com
 *"tolerância de millivolts"*, **não está em milivolts**. É um número adimensional que ninguém pode
 calibrar contra uma medição de multímetro. É **D-03**.
 
-O Zephyr já resolve isso, e a função existe desde antes desta versão:
+O Zephyr resolve isso — **mas há uma armadilha neste driver, e ela é silenciosa. Leia o D-19
+antes de escrever esta linha.**
 
 ```c
 int32_t mv = sample_buffer[0];
+
+/* ⚠️ EXIGE, nos nós de canal do overlay:
+     zephyr,vref-mv = <3300>;
+     zephyr,reference = "ADC_REF_EXTERNAL0";   (qualquer coisa != ADC_REF_INTERNAL)
+
+   Com ADC_REF_INTERNAL esta função devolve 0 mV com codigo de SUCESSO, porque o
+   adc_mcux_adc16 nunca preenche ref_internal. Ver D-19. */
 int err = adc_raw_to_millivolts_dt(&canais[id], &mv);
 if (err < 0) { return err; }
 *mv_out = mv;
 ```
 
-`adc_raw_to_millivolts_dt` usa a referência e o ganho **declarados no devicetree**, então mudar
-`zephyr,reference` ou `zephyr,resolution` no overlay passa a corrigir a conversão sozinho, em vez
-de exigir um novo fator empírico.
+⛔ **O modo de falha é o pior possível.** Se o overlay ficar em `ADC_REF_INTERNAL`, os quatro
+sensores leem **0 mV**, os dois erros ficam sempre zero, a zona morta nunca é excedida e o tracker
+**não se move** — sem erro, sem log, com todas as chamadas retornando sucesso. E na tela isso é
+indistinguível de "está escuro". Trocar o `× 0.889` por isto sem mexer no overlay é **pior que não
+mexer em nada**: a escala errada de hoje pelo menos varia com a luz.
+
+Com o overlay corrigido ([01-devicetree-adc-4-canais.md](01-devicetree-adc-4-canais.md)),
+`adc_raw_to_millivolts_dt` passa a usar o `zephyr,vref-mv` e o ganho declarados, então mudar a
+referência ou a resolução no devicetree corrige a conversão sozinho, em vez de exigir um novo fator
+empírico.
 
 ⭐ **É esta mudança que faz os limiares da spec de controle serem calibráveis com multímetro** —
 sem ela, `ZONA_MORTA_MV` continua sendo chute.
+
+**Alternativa aceitável, se preferir não depender do overlay:** a conta à mão,
+`mv = (raw * 3300) / 4096`. Perde a vantagem de o devicetree ser a fonte da escala, mas não tem
+como falhar em silêncio — e é honesta sobre o 3,3 V ser nominal, não medido.
 
 ### 3. `ldr_ler_todos()`, e por que ele não é conveniência
 

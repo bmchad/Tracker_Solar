@@ -53,6 +53,10 @@ em **segundos inteiros** — 1 ou 2. Três consequências:
 3. **A granularidade é de 1 segundo.** Um SG90 leva cerca de 0,1 s por 60° — a espera mínima
    possível é uma ordem de magnitude maior do que o movimento precisa.
 
+⭐ **A separação é o que viabiliza a regra de "não amostrar durante o movimento"**, que é dona da
+spec de controle ([03-controle-4-quadrantes.md](03-controle-4-quadrantes.md)): com a espera fora da
+função de servo, quem orquestra pode ler **depois** dela, e não no meio.
+
 Com a separação, o `main.c` comanda os dois eixos e faz **uma** espera, dimensionada pelo maior dos
 dois movimentos. A espera continua existindo — sem realimentação de posição ela é a única garantia
 de que o servo chegou (ver
