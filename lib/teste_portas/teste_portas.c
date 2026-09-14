@@ -15,7 +15,13 @@
    --------------------------------------------------------------------------- */
 #define MOD_50HZ            7500   /* 375 kHz / 50 Hz - periodo de 20 ms      */
 #define SEGUNDOS_POR_DEGRAU 5      /* tempo para o multimetro assentar        */
-#define ESCADAS_ANTES_DE_SAIR 2    /* ~50 s por escada. Suba se faltar tempo  */
+
+/* ⚠️ Com a serial muda, nao da para saber QUAL fase esta rodando - por isso as
+   fases ficam atras de chaves de compilacao, e o padrao e so a Fase 1, que e
+   legivel com multimetro e LED, sem depender de texto nenhum.
+   Trocar 0 por 1 religa a fase. */
+#define RODAR_FASE_0_LED    0      /* piscar o LED como fase separada         */
+#define RODAR_FASES_PWM     0      /* duty grosso (fase 2) + duty de servo (3) */
 
 /* Pulso em que a escada TERMINA, antes de devolver o controle.
    ⛔ Nao pode ser o ultimo valor da fase 3 (750 = 2,0 ms = 180 graus): sair
@@ -67,42 +73,67 @@ static void fase0_led_vivo(void)
 }
 
 /* --- Fase 1 -----------------------------------------------------------------
-   O pino como GPIO puro: 3,3 V e 0 V, sem ambiguidade nenhuma no multimetro.
+   Os dois pinos como GPIO puro, ACIONADOS JUNTOS, com o LED espelhando o
+   estado. Le-se sem serial e sem saber que fase esta rodando:
+
+       LED ACESO   -> PTD3 e PTD0 devem medir ~3,3 V
+       LED APAGADO -> os dois devem medir ~0 V
+
+   ⚠️ Acionar um pino por vez (como era antes) deixava o outro em 0 V por 15 de
+   cada 20 s - indistinguivel de "pino morto" sem a serial dizendo de quem era
+   a vez. Juntos, qualquer pino que se meca segue o mesmo ritmo do LED.
 
    ⭐ MEDIR NA PONTA DO JUMPER, no conector que vai ao servo - nao no pino da
    placa. Assim o mesmo teste pega fio partido e mau contato.
 
    Roda ANTES de qualquer pwm_tpm_Ch_Init: o mux do pino precisa estar em GPIO.
    --------------------------------------------------------------------------- */
-static void fase1_gpio_um_pino(const char *nome, gpio_pin_t pino)
+static bool fase1_preparar(void)
 {
-    int err = gpio_pin_configure(portad, pino, GPIO_OUTPUT_INACTIVE);
-
-    if (err < 0) {
-        printk("  ERRO ao configurar PTD%d como GPIO (%d)\n", pino, err);
-        return;
+    if (!device_is_ready(portad)) {
+        printk("[fase 1] ERRO: porta D nao esta pronta\n");
+        return false;
     }
 
-    printk("[fase 1] %s (PTD%d) em ALTO  - multimetro DC deve ler ~3,3 V\n",
-           nome, pino);
-    gpio_pin_set(portad, pino, 1);
-    esperar_degrau();
+    int e1 = gpio_pin_configure(portad, PINO_HORIZONTAL, GPIO_OUTPUT_INACTIVE);
+    int e2 = gpio_pin_configure(portad, PINO_VERTICAL,   GPIO_OUTPUT_INACTIVE);
 
-    printk("[fase 1] %s (PTD%d) em BAIXO - multimetro DC deve ler ~0 V\n",
-           nome, pino);
-    gpio_pin_set(portad, pino, 0);
+    if (e1 < 0 || e2 < 0) {
+        printk("[fase 1] ERRO ao configurar PTD3/PTD0 como GPIO (%d, %d)\n",
+               e1, e2);
+        return false;
+    }
+
+    /* O LED e o unico indicador que sobrevive a serial muda. Se ele nao estiver
+       pronto o teste continua - o multimetro ainda vale -, mas sem espelho. */
+    if (gpio_is_ready_dt(&led_vermelho)) {
+        gpio_pin_configure_dt(&led_vermelho, GPIO_OUTPUT_INACTIVE);
+    }
+
+    return true;
+}
+
+static void fase1_aplicar(int nivel)
+{
+    gpio_pin_set(portad, PINO_HORIZONTAL, nivel);
+    gpio_pin_set(portad, PINO_VERTICAL,   nivel);
+
+    if (gpio_is_ready_dt(&led_vermelho)) {
+        gpio_pin_set_dt(&led_vermelho, nivel);   /* espelho */
+    }
+
+    printk("[fase 1] PTD3 e PTD0 em %s - LED %s - multimetro DC ~%s\n",
+           nivel ? "ALTO " : "BAIXO",
+           nivel ? "ACESO " : "APAGADO",
+           nivel ? "3,3 V" : "0 V");
+
     esperar_degrau();
 }
 
 static void fase1_gpio(void)
 {
-    if (!device_is_ready(portad)) {
-        printk("[fase 1] ERRO: porta D nao esta pronta; pulando\n");
-        return;
-    }
-
-    fase1_gpio_um_pino("horizontal", PINO_HORIZONTAL);
-    fase1_gpio_um_pino("vertical",   PINO_VERTICAL);
+    fase1_aplicar(1);
+    fase1_aplicar(0);
 }
 
 /* --- Fases 2 e 3 ------------------------------------------------------------
@@ -152,19 +183,35 @@ void teste_portas_servo(void)
     printk("sao pulso de servo valido.\n\n");
 
     /* SC |= ..., nao uma escrita: reinicializar com parametros diferentes
-       acumularia bits. Por isso uma vez so, fora do laco (D-02). */
+       acumularia bits. Por isso uma vez so, fora do laco (D-02).
+       So importa para as fases de PWM; com elas desligadas, e inofensivo. */
     pwm_tpm_Init(TPM0, TPM_PLLFLL, MOD_50HZ, TPM_CLK, PS_128, EDGE_PWM);
 
-    for (int escada = 1; escada <= ESCADAS_ANTES_DE_SAIR; escada++) {
-        printk("--- escada %d de %d ---\n", escada, ESCADAS_ANTES_DE_SAIR);
-        fase0_led_vivo();
-        fase1_gpio();
-        fases_pwm();
+    if (!fase1_preparar()) {
+        printk("ERRO: sem GPIO, o teste nao tem o que medir. Parando.\n");
+        return;
     }
 
-    /* Sai em 0 graus, nao nos 180 em que a fase 3 termina - ver CNV_REPOUSO. */
-    pwm_tpm_CnV(TPM0, CANAL_HORIZONTAL, CNV_REPOUSO);
-    pwm_tpm_CnV(TPM0, CANAL_VERTICAL,   CNV_REPOUSO);
-    printk("=== fim do teste de portas; pinos em %u (1,0 ms = 0 graus) ===\n\n",
-           CNV_REPOUSO);
+    /* Repete para sempre: o alvo aqui e um osciloscopio humano com multimetro,
+       e ele precisa de tempo. Nao ha fim porque nao ha o que rodar depois -
+       ver o cabecalho sobre este arquivo ser andaime. */
+    for (;;) {
+        if (RODAR_FASE_0_LED) {
+            fase0_led_vivo();
+        }
+
+        fase1_gpio();
+
+        if (RODAR_FASES_PWM) {
+            fases_pwm();
+
+            /* Sai dos 180 graus em que a fase 3 termina - ver CNV_REPOUSO. */
+            pwm_tpm_CnV(TPM0, CANAL_HORIZONTAL, CNV_REPOUSO);
+            pwm_tpm_CnV(TPM0, CANAL_VERTICAL,   CNV_REPOUSO);
+
+            /* O PWM deixou os pinos no mux 4; devolve os dois ao GPIO para a
+               proxima volta da fase 1 medir o que ela promete medir. */
+            fase1_preparar();
+        }
+    }
 }

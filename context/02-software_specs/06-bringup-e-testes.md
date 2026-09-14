@@ -150,3 +150,37 @@ se ela não tiver efeito colateral. Ver
 ⛔ **E não há typecheck útil além do compilador.** `pio run` é a única barreira, e ela deixa passar
 declaração implícita (D-07) com aviso. Ler os avisos do build faz parte do procedimento, não é
 opcional.
+
+---
+
+## ⭐ Medir PWM com multímetro — sem osciloscópio
+
+Não há osciloscópio na bancada, e não é preciso: **multímetro em DC mede a média**, e média de um
+PWM é o *duty* vezes a tensão. Sobre os 3,3 V dos pinos do KL25Z, com `MOD = 7500` (50 Hz):
+
+| `CnV` | Pulso | Duty | Multímetro (DC) |
+|---|---|---|---|
+| 0 | — | 0% | **0 V** |
+| **375** | 1,0 ms | 5% | **~0,165 V** ← 0° de servo |
+| 563 | 1,5 ms | 7,5% | ~0,248 V |
+| 750 | 2,0 ms | 10% | ~0,330 V |
+| 3750 | 10 ms | 50% | **~1,65 V** ← valor de teste, inconfundível |
+| 7500 | — | 100% | **~3,3 V** |
+
+⭐ **Isso torna leituras pequenas interpretáveis em vez de suspeitas.** Em 2026-09-14, "0,16 V
+estáveis em PTD3 e PTD0" parecia pino morto ou ruído; pela tabela, é **exatamente um pulso de 1 ms**
+— ou seja, os canais estavam ativos e parados em 0°, o que apontou o diagnóstico para um firmware
+antigo ainda em execução, e não para o pino.
+
+⚠️ **Para validar o TPM, use 50% de duty, não os valores de servo.** 1,65 V no meio da escala é
+inconfundível; distinguir 0,165 de 0,248 V num multímetro barato, não.
+
+⭐ **E quando a média DC for pequena demais para confiar, meça o mesmo ponto em tensão AC:** pino
+comutando dá leitura AC não nula, pino parado (alto ou baixo fixo) dá ~0. Isso prova **chaveamento**
+sem depender do valor absoluto.
+
+⚠️ **O TPM é hardware e continua gerando pulso depois que a CPU para.** `main` retornar, travar num
+laço ou dar hard fault **não** desliga o timer nem muda o `CnV`. Então uma tensão estável e
+plausível num pino de servo **não prova** que o firmware está rodando — prova só que o timer foi
+configurado em algum momento. Para saber se a CPU está viva, é preciso algo que **mude** ao longo
+do tempo: o LED, a serial, ou o próprio duty variando.

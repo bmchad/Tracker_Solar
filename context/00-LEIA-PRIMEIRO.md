@@ -8,14 +8,18 @@ O protótipo está passando de **2 LDRs para 4**. Nesta virada o eixo vertical d
 aberta (hoje ele vem de um cálculo astronômico) e passa a ser **malha fechada** pelo par
 cima/baixo, com o cálculo virando *feedforward*.
 
-⚠️ **Este projeto nasceu de um carrinho seguidor de linha, e isso deixou marcas.** O `README.MD`
-da raiz descreve **o carrinho**, não o tracker. O projeto CMake se chama `carrinho1`. Existe um
-repositório git órfão dentro de `src/.git`. Nada disso é intencional — está tudo catalogado em
-[10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md](10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md).
+⛔ **CHEGANDO AGORA? COMECE POR [CONTINUAR-AQUI.md](CONTINUAR-AQUI.md).** Há uma investigação aberta
+e sem conclusão — **os servos não se movem**, e três saídas independentes estão mudas (serial, LED e
+servo). Aquele arquivo tem o que foi medido, o que já foi **descartado com evidência** e qual é o
+próximo experimento. Sem ele, você vai regastar hipóteses que custaram horas.
 
-⛔ **A dívida mais urgente:** `lib/servo_motor/` e `lib/testes/` estão **untracked** no git, e
-`src/main.c` tem alterações não commitadas. A arquitetura atual inteira existe só nesta máquina —
-um `git clean -fd` apaga o projeto. Ver **D-30**.
+⚠️ **Este projeto nasceu de um carrinho seguidor de linha, e isso deixou marcas.** O projeto CMake
+ainda se chama `carrinho1` (`zephyr/CMakeLists.txt`), e existe um repositório git órfão dentro de
+`src/.git`. Está catalogado em
+[10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md](10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md).
+⭐ O `README.md` da raiz **já foi reescrito** e descreve o tracker — essa parte do **D-33** está
+resolvida, e o **D-30** (código fora do git) também: hoje só `lib/teste_portas/teste_portas.c` tem
+alteração pendente.
 
 ---
 
@@ -23,6 +27,7 @@ um `git clean -fd` apaga o projeto. Ver **D-30**.
 
 | Se você quer… | Leia |
 |---|---|
+| ⛔ **retomar a investigação em aberto** | [CONTINUAR-AQUI.md](CONTINUAR-AQUI.md) |
 | entender o que o produto é | [01-project_vision/01-o-que-e-o-tracker.md](01-project_vision/01-o-que-e-o-tracker.md) |
 | saber o que muda com 4 LDRs | [01-project_vision/02-upgrade-para-4-ldr.md](01-project_vision/02-upgrade-para-4-ldr.md) |
 | **escrever o código** do upgrade | [02-software_specs/](02-software_specs/), na ordem 00 → 06 |
