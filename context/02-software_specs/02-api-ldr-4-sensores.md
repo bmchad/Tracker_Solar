@@ -156,6 +156,20 @@ que já passou.
 se um canal falhar. Ele é a **única** função que o laço de controle chama; `ldr_ler()` fica para o
 bringup, onde ler um sensor por vez é justamente o objetivo.
 
+## ⚠️ Canal sem sensor conectado **não** é erro de inicialização
+
+Vale escrito porque a intuição diz o contrário, e a crença já apareceu na bancada: com os LDRs
+desligados, `ldr_inicializar()` **não** devolve erro.
+
+- `device_is_ready()` pergunta se o **driver do `adc0`** está pronto — ele não tem como saber o que
+  está pendurado no pino;
+- `adc_channel_setup_dt()` valida **canal, tempo de aquisição, diferencial e ganho**, e nada mais
+  (mesma leitura de `adc_mcux_adc16.c:102-132` que a spec do overlay já cita).
+
+Entrada analógica solta lê **valor sem sentido, não erro** — tipicamente flutuando conforme o que
+houver de acoplamento no ar. Então "o tracker não dá boot sem os sensores" é falso, e usar isso para
+explicar uma falha fecha, por engano, uma hipótese que nunca foi testada.
+
 ## Detalhe que sobra de dívida
 
 `sample_buffer` continua um `static` compartilhado. Fecha hoje porque há uma thread só, e passa a

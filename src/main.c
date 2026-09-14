@@ -19,6 +19,7 @@ em init_hora.c coloque hora, minuto segundo
 #include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
 #include <servo_angulo_tempo.h>
 #include <testes.h>
+#include <teste_portas.h>
 
 // Para um clock de 48 MHz e prescaler de 128 (PS_128), a frequência do timer é 375 kHz.
 // Para um período de 20ms (50Hz), TPM_MODULE (MOD) deve ser 7500.
@@ -33,15 +34,25 @@ em init_hora.c coloque hora, minuto segundo
 //função principal
 int main(void){
 
+    /* ANDAIME DE BANCADA - tirar quando o diagnostico fechar.
+       Fica como PRIMEIRA coisa do main de proposito: qualquer coisa capaz de
+       abortar o boot (o ldr_inicializar(), quando voltar) mataria junto o teste
+       que existe para investigar isso. Roda um numero fixo de escadas e cede a
+       vez ao teste_motores() abaixo. */
+    teste_portas_servo();
+
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
     pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
     pwm_tpm_Ch_Init(TPM0, 0, TPM_PWM_H, GPIOD, 0);
 
+/*
+
     //configura o ldr
     printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
 
     // Inicializa o hardware do ADC
+    
     if (ldr_inicializar() < 0)  //configura o ldr
     {
         printk("Falha critica na inicializacao do ADC. Parando.\n");
@@ -65,6 +76,8 @@ int main(void){
     servo_horizontal_angulo_tempo(angulo, 1);
     servo_vertical_angulo_tempo(angulo, 1);
     int contador_vertical = 0;
+
+    */
 
     /* D-06: os testes eram chamados sem condicao nenhuma e custavam
        12 min 40 s de sono bloqueante em TODO boot, antes da primeira leitura de

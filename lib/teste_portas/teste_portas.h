@@ -1,0 +1,22 @@
+#ifndef TESTE_PORTAS_H
+#define TESTE_PORTAS_H
+
+/* Escada de diagnostico dos pinos de servo (PTD3 horizontal, PTD0 vertical),
+   pensada para ser lida com MULTIMETRO - nao precisa de osciloscopio.
+
+   Quatro fases, cada uma eliminando um suspeito diferente:
+
+     0. LED vermelho da placa pisca         -> "o firmware esta rodando?"
+     1. PTD3/PTD0 como GPIO, alto e baixo   -> pino, mux de GPIO e o JUMPER
+     2. PWM com duty de 0% / 50% / 100%     -> o TPM0 em si
+     3. PWM nos duty reais de servo         -> o sinal que o servo consome
+
+   ⚠️ ANDAIME DE BANCADA. Sai do main() quando o diagnostico fechar.
+
+   Repete a escada ESCADAS_ANTES_DE_SAIR vezes (~50 s cada) e RETORNA, porque
+   medir com multimetro pede repeticao - dificilmente se le seis tensoes numa
+   passada so. Ao sair deixa os dois pinos em 1,0 ms (0 graus), e nao nos 2,0 ms
+   em que a ultima fase termina. */
+void teste_portas_servo(void);
+
+#endif /* TESTE_PORTAS_H */
