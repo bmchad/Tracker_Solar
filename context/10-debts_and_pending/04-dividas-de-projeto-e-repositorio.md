@@ -1,13 +1,19 @@
 # Dívidas de projeto e repositório
 
-Não são bugs de runtime: são armadilhas de manutenção. A primeira tem risco de **perda total do
-trabalho** e é a mais urgente da lista inteira.
+Armadilhas de manutenção, não bugs de runtime — com **uma exceção**: o **D-40** era bloqueio de
+build, e foi **resolvido em 2026-09-14**. Enquanto durou, nada podia ser testado.
+
+O **D-30** (o risco de perda total do trabalho) foi **resolvido** em 2026-09-02.
 
 ---
 
-## D-30 — `lib/servo_motor/` e `lib/testes/` estão **untracked**
+## D-30 — `lib/servo_motor/` e `lib/testes/` estavam **untracked** ✅ RESOLVIDO
 
-⛔ **A dívida mais urgente do projeto.**
+> ✅ **Resolvido em 2026-09-02**, por commit (`f92e447`). `git ls-files` confirma os quatro arquivos
+> versionados. O registro abaixo fica porque explica **por que** era urgente, e porque a ordem
+> "commitar antes de renomear" continua valendo para o D-32.
+
+~~⛔ **A dívida mais urgente do projeto.**~~
 
 ```
 $ git status --short
@@ -31,6 +37,112 @@ Custo de minutos, risco evitado de refazer o refactor de memória.
 ⚠️ Notar que **as specs de [../02-software_specs/](../02-software_specs/) renomeiam esses dois
 diretórios** (D-32). Commitar **antes** de renomear, senão o git vê a renomeação como criação e o
 histórico do refactor se perde de vez.
+
+---
+
+## D-40 — `pio run` não conclui: falha ao gerar `offsets.h` do Zephyr ✅ RESOLVIDO (2026-09-14)
+
+**Descoberto em 2026-09-02**, ao tentar compilar depois de corrigir os sete críticos.
+
+```
+*** [.pio\build\frdm_kl25z\zephyr\include\generated\zephyr\offsets.h]
+    Source `.pio\build\frdm_kl25z\offsets\zephyr\arch\arm\core\offsets\offsets.c.o'
+    not found, needed by target `...\offsets.h'.
+```
+
+Foi, por doze dias, **o bloqueio mais importante da lista**: enquanto durou, nada podia ser testado
+— nem as sete correções dos críticos, verificadas só por análise (`-fsyntax-only` com os includes
+reais) e nunca observadas rodando.
+
+⭐ **O que destravou, em 2026-09-14:** apagar `.pio/` **inteiro**, à mão, com a grafia do core dir
+unificada — `core_dir = D:/DevTools/.platformio` na seção `[platformio]` do `platformio.ini`. Depois
+disso o build completa: `offsets.h` gerado, **`firmware.elf` (860 KB) e `firmware.bin` (26 KB)**,
+1083 objetos. **Com o mesmo GCC 8.2.1 e o mesmo Zephyr 4.2.0** — nenhum pacote foi trocado.
+
+## A causa era o cache, e a pista estava dentro dele
+
+`C:\Users\berna\.platformio` é uma **junction** para `D:\DevTools\.platformio` — **uma** instalação,
+**dois** nomes. Sem `PLATFORMIO_CORE_DIR` definido, o PlatformIO deriva o core dir de `USERPROFILE`
+(grafia `C:`) enquanto o CMake grava o alvo resolvido (grafia `D:`). O `CMakeCache.txt` ficava
+internamente incoerente: `ZEPHYR_BASE` em `C:`, e `BOARD_DIR`/`SOC_FULL_DIR`/`Picolibc_SOURCE_DIR`
+em `D:`.
+
+Grafo de dependência de CMake/Ninja é indexado por **string** de caminho, então o mesmo arquivo com
+dois nomes vira dois nós. O erro do `offsets.h` era **destroço de um configure pela metade**, não a
+doença — e é por isso que a versão antiga deste item afirmava "não é cache sujo":
+`pio run -t fullclean` **não** removia esse `CMakeCache.txt`. Apagar `.pio/` à mão removia.
+
+⚠️ **As duas hipóteses antigas ficam descartadas**, e vale dizer por quê, porque as duas eram
+plausíveis: não era incompatibilidade do builder com o layout do Zephyr 4.x — ele compilou a árvore
+inteira, com Zephyr 4.2.0 — e não era o acento de `lib/angulo_incidência_solar/` (**D-32**), que
+segue como dívida de manutenção, só não era esta.
+
+## ⛔ Se o configure falhar, a mensagem engana — e não é toolchain
+
+Pode aparecer, com a árvore limpa:
+
+```
+cc1.exe: error: invalid --param name 'min-pagesize'
+undefined reference to `_exit'
+CMake Error: CMAKE_C_COMPILER not set, after EnableLanguage
+```
+
+⛔ **Nada disso é requisito não atendido**, e é a leitura errada que custa 242 MB de download:
+
+- `--param=min-pagesize` é uma **sonda** do Zephyr (`zephyr_cc_option` → `check_c_compiler_flag`).
+  Ela falha no GCC 8.2.1, e o flag simplesmente não é usado. Falhar é o resultado previsto — **não**
+  é "o Zephyr 4.2 exige GCC 11+";
+- o `_exit` vem do sub-projeto de **identificação de compilador** do CMake tentar *linkar* um
+  executável num alvo bare-metal, onde não existe `_exit`.
+
+**Rodar de novo é o que resolve — não trocar de toolchain.** O GCC 8.2.1 que a plataforma pina
+compila este projeto com Zephyr 4.2.0 até o fim.
+
+⭐ **E o cache que decide isso NÃO está em `.pio/`.** É o do pacote:
+
+```
+Cache files will be written to: D:/DevTools/.platformio/packages/framework-zephyr/.cache
+```
+
+Foi assim que os dois resultados opostos apareceram no mesmo dia. Com esse cache **frio**, a
+primeira configuração falhou. Depois de ele estar populado, `.pio/` foi apagado **inteiro** e o
+build passou **de primeira** (138 s). Ou seja: a falha é da primeira configuração **com o cache do
+pacote frio**, não da primeira configuração de cada árvore — apagar `.pio/` não a reproduz.
+
+⚠️ **Continua sendo observação, não experimento:** ninguém limpou o `.cache` do pacote para
+confirmar a leitura. Se reaparecer e rodar de novo **não** resolver, o log a abrir é
+`.pio/build/frdm_kl25z/CMakeFiles/CMakeError.log`, onde essas mensagens aparecem inteiras — o
+console mostra só o resumo.
+
+---
+
+## D-43 — Mexer no overlay **não** regenera o devicetree
+
+**Medido em 2026-09-14**, ao acrescentar os dois canais de ADC dos LDRs novos.
+
+| Arquivo | Carimbo |
+|---|---|
+| `zephyr/frdm_kl25z.overlay` (editado, 4 canais) | 14:46 |
+| `.pio/build/frdm_kl25z/zephyr/zephyr.dts` (gerado) | **14:20** |
+
+O `pio run` recompilou as fontes e **reaproveitou** a configuração anterior do CMake: o `.dts`
+gerado ainda dizia `io-channels = <&adc0 0xc>, <&adc0 0x8>`, sem `channel@9` nem `channel@d`. Só
+apagar `.pio/` regenerou a árvore.
+
+⛔ **Por que é caro:** a edição do overlay pode não ter efeito nenhum, ou falhar por um motivo que
+**não corresponde ao arquivo-fonte que você está olhando**. No caso, o sintoma foi um `BUILD_ASSERT`
+disparando contra um overlay que já estava correto — o que parece bug no código e é cache.
+
+⭐ **O que salvou foi o `BUILD_ASSERT` de `lib/ldr/ldr.c`**, que compara `DT_PROP_LEN(ADC_NODE,
+io_channels)` com `LDR_COUNT`. Sem ele o firmware teria subido com dois sensores apontando para um
+devicetree antigo, e o sintoma apareceria como leitura estranha na bancada — não como erro de build.
+
+**Receita:** mexeu no overlay (ou no `prj.conf`, pelo mesmo mecanismo), **apague `.pio/` antes de
+concluir qualquer coisa a partir do resultado**. `pio run -t fullclean` não basta; ver D-40.
+
+**Quando isto deixa de ser dívida:** se alguém descobrir o gatilho correto de reconfiguração nesta
+integração PlatformIO ↔ Zephyr (algo como tocar o `CMakeLists.txt`, ou um alvo dedicado), a receita
+vira uma linha e o item fecha. Ninguém procurou ainda.
 
 ---
 

@@ -5,36 +5,25 @@
 #include <ldr.h>
 #include <init_hora.h>              // Biblioteca do relógio de software
 #include <angulo_incidencia_solar.h>
+#include <servo_angulo_tempo.h>     // D-07: faltava. As chamadas de servo abaixo
+                                    // eram declaracao implicita - o compilador
+                                    // assumia `int f()` e parava de conferir os
+                                    // argumentos. Removida do C23.
 #include <testes.h>
 
-#define TPM_MODULE 7500
-#define SLEEP_TIME_MS 1000
-#define INPUT_PORT DT_NODELABEL(gpiod)
-#define INPUT_PIN 20
-#define NUMERO_DE_TESTES 10
+/* D-06: era 10. Dez varreduras identicas nao revelam nada que a primeira nao
+   revele, e custavam 10 x 4 varreduras x 19 passos = 760 comandos de servo,
+   com 1 s de sono bloqueante cada: 12 min 40 s antes da primeira leitura de
+   tracking. Um reset ao meio-dia custava 12 minutos de sol. */
+#define NUMERO_DE_TESTES 5
+
+/* D-02: sem pwm_tpm_Init nem ldr_inicializar aqui. O main() ja fez. */
 
 int teste_motores(void){
 
-    // Configura os motores
-    pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
-    pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
-    pwm_tpm_Ch_Init(TPM0, 0, TPM_PWM_H, GPIOD, 0);
+    printk("[teste] motores: varredura completa dos dois eixos\n");
 
-    //configura o ldr
-    printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
-
-    // Inicializa o hardware do ADC
-    if (ldr_inicializar() < 0)  //configura o ldr
-    {
-        printk("Falha critica na inicializacao do ADC. Parando.\n");
-        return -1;
-    }
-
-    printk("ADC pronto. Entrando no loop de leitura.\n");
-
-/*TESTE 1, MOTORES OK MAS LDR NÃO*/
-
-    for(int i=0; i<NUMERO_DE_TESTES; i++){
+    for(int i=0;; i++){
         //teste de motores horizontais
         for(int angulo = 0; angulo <= 180; angulo += 10){
             servo_horizontal_angulo_tempo(angulo, 1);
@@ -53,36 +42,41 @@ int teste_motores(void){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
-    }       
+    }
    return 0;
 
 }
 
-int teste_ldr(){
-    // Configura os motores
-    pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
-    pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
-    pwm_tpm_Ch_Init(TPM0, 0, TPM_PWM_H, GPIOD, 0);
+int teste_ldr(void){
 
-    //configura o ldr
-    printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
+    printk("[teste] ldr: leitura dos quatro sensores, em mV\n");
 
-    // Inicializa o hardware do ADC
-    if (ldr_inicializar() < 0)  //configura o ldr
-    {
-        printk("Falha critica na inicializacao do ADC. Parando.\n");
-        return -1;
+    /* D-01: erro separado do valor. Uma leitura que falha aparece como falha,
+       nao como um numero baixo plausivel.
+
+       Uma chamada so, e de proposito: ldr_ler_todos() faz as quatro conversoes
+       encostadas, sem printk no meio. Quatro ldr_ler() com log entre eles
+       mediriam quatro instantes diferentes (a serial a 115200 gasta ~3 ms por
+       linha), e a diferenca entre quadrantes viraria em parte temporal. */
+    for(int i=0; i<NUMERO_DE_TESTES; i++){
+        int32_t mv[LDR_COUNT] = {0};
+        int err = ldr_ler_todos(mv);
+
+        if(err < 0){
+            printk("LDR: varredura falhou (%d)\n", err);
+        } else {
+            /* ⚠️ O SINAL destas duas contas e a mistura do controle, e ela e
+               dona de context/02-software_specs/03-controle-4-quadrantes.md.
+               Aqui e so o mesmo sentido, para o teste do dedo no bringup bater
+               com o que o controle vai enxergar. */
+            printk("LDR esq=%d dir=%d cima=%d baixo=%d mV | erro_h=%+d erro_v=%+d mV\n",
+                   mv[LDR_ESQ], mv[LDR_DIR], mv[LDR_CIMA], mv[LDR_BAIXO],
+                   (int)(mv[LDR_ESQ]  - mv[LDR_DIR]),
+                   (int)(mv[LDR_CIMA] - mv[LDR_BAIXO]));
+        }
+        k_msleep(500);
     }
 
-    printk("ADC pronto. Entrando no loop de leitura.\n");
-
-    /*Teste 2: LDR*/
-       for(int i=0; i<NUMERO_DE_TESTES; i++){
-            printk("LDR direito: %f\n", ldr_ler('d'));
-            printk("LDR esquerdo: %f\n", ldr_ler('e'));
-            k_msleep(500);
-        }
-
-        return 0;
+    return 0;
 
 }

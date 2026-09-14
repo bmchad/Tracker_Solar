@@ -18,8 +18,8 @@ while(ang<0)  { ang+=180; }
 
 Pedir 185° entrega **5°**. Pedir −10° entrega **170°**. Ou seja: uma ordem que deveria parar no fim
 de curso manda a placa para o **extremo oposto**, com força e sem aviso. É **D-05**, e é a razão de
-ele estar entre os críticos: combinado com **D-04** (NaN chegando como ângulo) e com a ausência de
-limite no eixo vertical (**P-06**), o modo de falha é mecânico.
+ele estar entre os críticos: combinado com **D-04** (NaN chegando como ângulo) e com o limite ainda
+provisório do eixo vertical (**P-06**), o modo de falha é mecânico.
 
 ```c
 /* Satura no curso do eixo. Sem envolver: um pedido fora de curso vira o limite,
@@ -28,9 +28,11 @@ int servo_saturar(eixo_t eixo, int graus);
 ```
 
 Os limites são propriedade **mecânica** do eixo, então moram aqui e não no controle — quem os
-conhece é [../03-hardware_specs/03-atuadores-sg90s.md](../03-hardware_specs/03-atuadores-sg90s.md):
-horizontal 10°–170°, vertical **a definir** (**P-06**). Até P-06 ser respondida, o vertical usa um
-limite conservador e o comentário registra que ele é provisório.
+conhece é [../03-hardware_specs/03-atuadores-mg90s.md](../03-hardware_specs/03-atuadores-mg90s.md):
+horizontal 10°–170°, vertical **10°–160°** (**P-06** respondida: não há batente de montagem, o
+batente é o fim de curso do próprio servo — e o fator 1,47 faz 180° comandados virarem 2,47 ms, além
+dele). O vertical continua **provisório** até **P-08** medir a faixa de pulso, e o comentário
+registra isso.
 
 ## Separar comandar de esperar
 
@@ -50,7 +52,7 @@ em **segundos inteiros** — 1 ou 2. Três consequências:
    "mediana das últimas 5 leituras" deixa de ter significado temporal fixo.
 2. **Os dois eixos são serializados.** Mover os dois custa a soma das duas esperas, mesmo eles
    sendo independentes e podendo assentar em paralelo.
-3. **A granularidade é de 1 segundo.** Um SG90 leva cerca de 0,1 s por 60° — a espera mínima
+3. **A granularidade é de 1 segundo.** Um MG90S leva cerca de 0,1 s por 60° — a espera mínima
    possível é uma ordem de magnitude maior do que o movimento precisa.
 
 ⭐ **A separação é o que viabiliza a regra de "não amostrar durante o movimento"**, que é dona da
@@ -60,7 +62,7 @@ função de servo, quem orquestra pode ler **depois** dela, e não no meio.
 Com a separação, o `main.c` comanda os dois eixos e faz **uma** espera, dimensionada pelo maior dos
 dois movimentos. A espera continua existindo — sem realimentação de posição ela é a única garantia
 de que o servo chegou (ver
-[../03-hardware_specs/03-atuadores-sg90s.md](../03-hardware_specs/03-atuadores-sg90s.md)) — mas
+[../03-hardware_specs/03-atuadores-mg90s.md](../03-hardware_specs/03-atuadores-mg90s.md)) — mas
 passa a ser decisão de quem orquestra, em milissegundos.
 
 ## Calibração parametrizada
@@ -84,7 +86,7 @@ Viram constantes nomeadas, e o comentário histórico (as correções empíricas
 /* ⚠️ Fatores EMPÍRICOS, nunca medidos com goniômetro — ver P-08.
    Historico declarado no codigo original: partiu de x2 ("pedi 180, moveu 90"),
    depois x140/180 duas vezes no horizontal e x140/180 + x170/180 no vertical.
-   Suspeita registrada em P-08: o SG90 provavelmente quer 0,5-2,4 ms, e nesse
+   Suspeita registrada em P-08: o servo provavelmente quer 0,5-2,4 ms, e nesse
    caso o certo e mexer em CNT_PULSO_MIN/MAX, nao multiplicar o angulo. */
 #define FATOR_H  1.21
 #define FATOR_V  1.47

@@ -27,6 +27,18 @@ double rad2deg(double rad) {
     return rad * 180.0 / PI;
 }
 
+/* D-04: acos/asin fora de [-1,+1] devolvem NaN, e converter NaN para int e
+   comportamento INDEFINIDO em C - o servo receberia um numero arbitrario.
+   Acontece de dois jeitos aqui: -tan(phi)tan(delta) passa de 1 em latitude
+   alta, e cos_theta e uma soma de cinco produtos cujo erro de arredondamento
+   passa de 1,0 por uma fracao de LSB justo perto do apontamento perfeito -
+   exatamente onde um tracker que funciona vive. */
+double clamp_dominio(double x) {
+    if (x > 1.0)  { return 1.0; }
+    if (x < -1.0) { return -1.0; }
+    return x;
+}
+
 double arredondar_para_multiplo_de_5(double theta) {
     return round(theta / 5.0) * 5.0;
 }
@@ -107,7 +119,7 @@ double calcular_theta(double HL, double gama_p) {
     // 5 e 6. Por do Sol e Duracao da Insolacao (N)
     //cos(omega_s) = -tan(phi)*tan(delta)
     double cos_ws = -tan(deg2rad(phi)) * tan(deg2rad(delta));
-    double omega_s = rad2deg(acos(cos_ws));
+    double omega_s = rad2deg(acos(clamp_dominio(cos_ws)));   /* D-04 */
     double N = (2.0 / 15.0) * omega_s;
     //printf("Duracao da insolacao no dia (N): %.2lf h\n", N);
 
@@ -131,7 +143,7 @@ double calcular_theta(double HL, double gama_p) {
     double termo5 = cos_delta * sen_beta * sen_gama * sen_omega;
 
     double cos_theta = termo1 + termo2 + termo3 + termo4 + termo5;
-    double theta = rad2deg(acos(cos_theta));
+    double theta = rad2deg(acos(clamp_dominio(cos_theta)));  /* D-04 */
 
     //printf("\n>>> ANGULO DE INCIDENCIA S/ PLACA (theta): %.2lf graus <<<\n\n", theta);
 

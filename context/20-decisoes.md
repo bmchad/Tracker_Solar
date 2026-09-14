@@ -226,8 +226,13 @@ significa **rail de alimentação separado com terra compartilhado num ponto só
 separado.
 
 **Se o teste de 3 passos falhar**, a fonte externa entra com evidência, e a escolha é por **ESR**,
-não capacidade: power bank USB 5 V (5 V é o meio da faixa do SG90, ESR baixa, 2 A comuns) ou
+não capacidade: power bank USB 5 V (5 V é o meio da faixa de 4,8–6 V do MG90S, ESR baixa, 2 A comuns) ou
 4× AA NiMH (~0,15 Ω no conjunto). Alcalina 6 V tem quase 1 Ω e cai ~1 V a 1 A — evitar.
+
+⚠️ **Emendada em 2026-09-14 pela DEC-16.** As duas premissas desta decisão mudaram — o servo virou
+MG90S e o consumo de bringup se revelou de **regime**, não de degrau —, e os servos saíram do
+`P5V_USB` sem esperar o teste de 3 passos. O raciocínio acima continua válido e vale a leitura: é
+dele que vem a regra do terra comum e a escolha de fonte por ESR.
 
 ---
 
@@ -255,3 +260,109 @@ overlay antes só inferia. E a ressalva que veio junto: os mesmos pads são cana
 mesmo `MUX(0)`, então ADC e touch disputam o pad sem mux que os separe. Sem conflito hoje (o
 `prj.conf` não habilita TSI), registrado em
 [03-hardware_specs/01-plataforma-e-pinagem.md](03-hardware_specs/01-plataforma-e-pinagem.md).
+
+---
+
+## DEC-13 — O eixo horizontal fica em malha fechada pura
+
+**2026-09-14.** Encerra **P-09**. Não haverá offset de montagem do azimute: `AZIMUTE_DO_SERVO_ZERO`
+e a tradução "azimute do céu → grau de servo" saem do projeto. O par esquerda/direita comanda o
+horizontal sozinho, como já faz hoje.
+
+**Rejeitado:** medir com bússola no passo 2 do bringup e implementar o feedforward de azimute, que é
+o que a spec previa.
+
+**Motivo:** o ajuste é dinâmico. A malha do LDR já corrige o azimute continuamente, e o offset de
+montagem só existiria para alimentar um feedforward que, no horizontal, duplicaria o que a malha faz
+— ao custo de um número medido a mão, que envelhece a cada vez que alguém encosta na base.
+
+⛔ **O que se perde, e a decisão aceita conscientemente:**
+
+1. **Partida.** Sem posição calculada, o boot é em posição arbitrária. Se ela estiver longe do sol,
+   os quatro quadrantes leem parecido, o erro cai dentro da zona morta e o tracker **dorme e não
+   acorda** — o mesmo modo de falha que **DEC-2** usou para rejeitar malha fechada pura no vertical.
+   A diferença é que aqui existe substituto barato e sem referência externa: **varrer 10° → 170° no
+   boot e parar no maior somatório dos quatro LDRs**. Se o substituto não for implementado, o risco
+   volta inteiro.
+2. **Envelope de sanidade no azimute.** Nada mais impede o horizontal de perseguir reflexo de
+   janela, poste ou farol. O envelope **vertical** continua, porque depende da elevação solar e não
+   deste offset.
+3. **O θ de diagnóstico.** `gama_p` segue recebendo grau mecânico numa fórmula que espera Sul = 0
+   (terceira parte de **D-11**), então θ só é honesto na parcela vertical.
+
+---
+
+## DEC-14 — A altura da aleta não será medida
+
+**2026-09-14.** Encerra **P-05**. A geometria do X (altura da aleta contra espaçamento dos sensores)
+não entra no escopo.
+
+**Rejeitado:** medir a aleta e derivar o ganho óptico e o ângulo de captura antes do bringup.
+
+**Motivo:** o número serviria para **prever** o ganho, e o ganho vai ser **medido** de qualquer
+forma no passo 1 do bringup, em mV por grau — que é a unidade que `GANHO_MV_POR_GRAU` consome.
+Prever para depois medir é trabalho duplicado, e a previsão dependeria de suposições ópticas que a
+medida dispensa.
+
+**Quando volta:** se o bringup mostrar zig-zag no alvo (pouco contraste) ou erro que satura a poucos
+graus (aleta alta demais). A aleta é o único parafuso físico da malha — mexer nela sem saber a
+geometria atual é tentativa e erro, e aí o número passa a valer o trabalho.
+
+---
+
+## DEC-15 — O painel fotovoltaico real fica fora do escopo
+
+**2026-09-14.** Encerra **P-07**. A carga do eixo vertical é a que já está na bancada.
+
+**Rejeitado:** montar um painel real para validar o apontamento pela corrente gerada.
+
+**Motivo:** a virada é de sensoriamento e controle (2 → 4 LDRs, vertical em malha fechada), e nada
+dela depende da massa da placa. Trocar a carga no meio mudaria a calibração de servo (**P-08**) e a
+margem de corrente (**P-02**) ao mesmo tempo em que se mexe no controle — dois experimentos
+misturados.
+
+⚠️ **O que se perde:** o **único critério de sucesso independente do firmware**. Sem painel real não
+há corrente gerada para medir, e o tracker continua juiz de si mesmo: as evidências de bom
+apontamento são o passo 1 do bringup e o θ de diagnóstico, ambos produzidos pelo código que se quer
+avaliar.
+
+**Quando volta:** se o vertical não sustentar a carga (servo zumbindo sem mover, o que realimenta
+**P-02**), ou quando for preciso demonstrar o tracker para alguém que não vai ler log.
+
+---
+
+## DEC-16 — Os servos saem do `P5V_USB` para uma fonte externa, com terra comum
+
+**2026-09-14.** Os dois MG90S passam a ser alimentados por uma **fonte externa de 5 V** (carregador
+USB de parede), com o **GND ligado ao da placa num único ponto** e o **5 V da fonte isolado** do
+`P5V_USB`. A placa segue alimentada pela USB do PC, que é o que dá gravação e serial.
+
+**Rejeitado — continuar no `P5V_USB` com capacitor de bulk**, que era o plano da **DEC-11**.
+
+**Motivo — as duas premissas da DEC-11 caíram:**
+
+1. **O servo mudou.** Os SG90 viraram **MG90S**: engrenagem metálica, corrente maior, e um modo de
+   falha pior no travamento, porque metal não cede para aliviar.
+2. ⭐ **O consumo do bringup é de regime, não de degrau.** A varredura de teste são 380 comandos de
+   1 s — mais de seis minutos de movimento quase ininterrupto. E **capacitor é dispositivo de
+   transiente**: ele entrega o degrau, não a média. Contra consumo em regime, o capacitor de bulk
+   não é mitigação fraca — é a ferramenta errada. A DEC-11 apostava nele como mitigação principal.
+
+Dois MG90S em movimento passam do orçamento de **500 mA** de uma porta USB 2.0, e o `P5V_USB` é
+**upstream do LDO de 3,3 V** que alimenta o MCU. O modo de falha, portanto, não é leitura ruim: é
+**reset** — e reset no meio de um teste produz um resultado que parece dado, com o relógio voltando
+para 15:00 (**D-17**).
+
+⛔ **Rejeitado — terra flutuante.** PWM é tensão referida ao terra; sem retorno comum o servo não
+interpreta o pulso. "Separar" aqui significa **rail separado com terra comum num ponto**, nunca
+terra separado. Vale também o inverso: o 5 V da fonte **não** encosta no `P5V_USB`, sob pena de
+realimentar a porta USB do PC.
+
+⛔ **Rejeitado — 4× AA alcalina (6 V):** quase 1 Ω de resistência interna, cai ~1 V a 1 A. NiMH
+(4,8 V, ~0,15 Ω) continua sendo a boa alternativa para campo, e é o que a DEC-11 já dizia.
+
+**A montagem está em**
+[03-hardware_specs/04-alimentacao-e-perguntas-abertas.md](03-hardware_specs/04-alimentacao-e-perguntas-abertas.md),
+que é o dono do assunto. **O que continua aberto:** o capacitor de reservatório (470–1000 µF) não
+existe na bancada, e a corrente real nunca foi medida — as duas coisas são a mesma medição, em série
+com a alimentação dos servos.

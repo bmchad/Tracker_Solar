@@ -58,24 +58,67 @@ spec de controle. Por isso o primeiro passo do bringup é **medir os quatro valo
 placa travada à mão, antes de qualquer motor girar — ver
 [../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md).
 
-## Circuito
+⚠️ **A altura da aleta não será medida (P-05 encerrada, DEC-14).** O número serviria para *prever*
+este ganho, e ele vai ser **medido** de qualquer forma no passo 1 — prever para depois medir é
+trabalho duplicado. A aleta continua sendo o único parafuso físico da malha: se aparecer zig-zag no
+alvo (pouco contraste) ou erro que satura cedo (aleta alta demais), é nela que se mexe, e aí a
+medida volta a fazer falta.
+
+## Circuito — a topologia, fechada pela montagem (P-03, 2026-09-14)
 
 Cada LDR forma um **divisor de tensão** com um resistor fixo, e o ponto médio vai ao pino do ADC.
+⭐ **Este arquivo é o dono deste fato.** A cadeia, do terra para cima:
 
-⚠️ **A topologia do divisor define o SINAL do erro, e o código atual não a documenta.** Nada nos
-arquivos-fonte diz se o LDR está do lado de VDD ou do lado do terra:
+```
+   GND ──[ R 10 kΩ ]──┬──[ LDR ]── 3,3 V
+                      │
+                      └── pino do ADC (A0..A3)
+```
 
-- **LDR para VDD, resistor para GND** (pull-down): mais luz → menor resistência do LDR → tensão
-  **sobe**. Tensão alta = muita luz.
-- **Resistor para VDD, LDR para GND** (pull-up): mais luz → tensão **cai**. Tensão alta = pouca luz,
-  e as duas subtrações acima ficam **invertidas**.
+**É pull-down: o resistor fixo está do lado do terra, o LDR do lado do rail.** O que o ADC lê é a
+queda no resistor, então mais luz → a resistência do LDR **cai** → o pino **sobe**. Tensão alta =
+muita luz, e as duas subtrações da seção acima valem **como estão escritas** — não há sinal a
+inverter no controle.
 
-Se o sinal estiver trocado, o tracker foge do sol em vez de segui-lo — e como o movimento é
-incremental, ele vai direto para o batente e fica lá. É a primeira coisa a confirmar no bringup.
-Ver **P-03**.
+**O resistor é de 10 kΩ**: marrom-preto-laranja, isto é 1-0 ×10³. Os quatro têm de ser o mesmo
+valor, e de preferência do mesmo lote, pela razão da seção "Descasamento de resistor" abaixo.
 
-O valor do resistor e a faixa de mV que o conjunto entrega no local de operação são **P-03** e
-**P-04**.
+⚠️ **Isto veio da montagem relatada, não de uma medida de bancada.** Confirmar é barato, e é por
+isso que o passo 1 do bringup continua no roteiro: iluminar um quadrante e ver o valor **subir**. Se
+cair, quem diverge é a montagem — e aí é a mistura do controle que inverte.
+
+⭐ **O que os 10 kΩ confirmam** é uma série de números que o resto do `context/` já vinha usando
+como suposição: os **~5 kΩ** de impedância de fonte em meia escala (10 k ∥ 10 k, quando o LDR também
+mede 10 kΩ), os **~8 mV** de offset por 1% de descasamento, e o polo do filtro de entrada — 5 kΩ ×
+100 nF = 500 µs, ou cerca de **320 Hz**. Ele está acima da fundamental de 50 Hz do PWM e isso é o
+esperado: o que o filtro mata é o **acoplamento capacitivo das bordas**, que é rápido, não a
+fundamental, que não se acopla por essa via.
+
+### A faixa entregue — P-04, respondida (2026-09-14)
+
+**As leituras ficam na ordem de 10² a 10³ mV**: entre cerca de 100 mV e 1 V, contra 3,3 V de fundo
+de escala. Invertendo o divisor (`V = 3,3 × 10 k / (10 k + R_LDR)`), isso diz em que faixa o LDR
+opera:
+
+| leitura | R do LDR | o que é |
+|---|---|---|
+| ~100 mV | ~320 kΩ | o LDR no escuro |
+| ~1000 mV | ~23 kΩ | o LDR no claro daquele ambiente |
+
+⭐ **A faixa útil está no terço de baixo da escala, e ainda assim sobra resolução de sobra:** 900 mV
+de excursão com 12 bits sobre 3,3 V (1 LSB ≈ 0,81 mV) são **~1100 contagens**, e a
+`ZONA_MORTA_MV = 30` fica em ~3% disso. Não há motivo para trocar o resistor por causa da escala.
+
+⚠️ **Mas a medida é do ambiente em que foi feita.** R do LDR entre 23 kΩ e 320 kΩ é luz de interior;
+sol direto leva o LDR para a casa de 1 kΩ, e aí o divisor entrega ~3,0 V nos quatro. Isso não satura
+o ADC, mas **comprime o contraste no topo** — perto de 3,3 V a curva V(R) é quase plana, e é
+justamente o contraste entre quadrantes que o controle usa. Se os quatro valores ao sol ficarem
+todos acima de ~3 V, quem desce é o resistor (1–2,2 kΩ), e as contas desta seção se refazem.
+
+⛔ **O que a faixa NÃO dá, e continua saindo só do passo 1 do bringup:** o **piso de ruído** com a
+placa parada no alvo, o **espalhamento entre os quatro** na sombra e o **mV por grau**. Não são
+pendência — são medição de bringup, e é o que mantém `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU`
+marcados como chute inicial na spec de controle.
 
 ## Topologia de ligação — decidida (DEC-10)
 
@@ -124,13 +167,26 @@ longos em paralelo.
 
 ### Descasamento de resistor é offset estático
 
-Os quatro resistores fixos devem ser do mesmo lote, de preferência medidos. Em meia escala, com
-10 kΩ:
+Os quatro resistores fixos devem ser do mesmo lote, de preferência medidos. Em meia escala, com os
+10 kΩ confirmados em "Circuito":
 
 > **1% de descasamento ≈ 8 mV** de offset estático
 
 Comparável à `ZONA_MORTA_MV` da spec de controle. Some-se a dispersão dos próprios LDRs, na seção
 abaixo, que é maior.
+
+⛔ **A quarta faixa é OURO: os resistores são de 5%, e é isso que domina o erro de casamento.** Dois
+deles em extremos opostos da tolerância descasam **10%**, o que por esta mesma conta dá **~80 mV**
+de offset estático — quase **três vezes** a `ZONA_MORTA_MV = 30`. E no pior sentido possível: um "o
+sol está daquele lado" permanente, que o controle persegue com passo proporcional até o fim de
+curso.
+
+⭐ **Medir os quatro com multímetro e escolher os mais próximos entre si é o item de montagem mais
+barato desta página.** Os 5% são a garantia do fabricante sobre o lote inteiro, não a dispersão de
+um punhado comprado junto — quatro resistores da mesma fita costumam cair dentro de 1%, e medir é o
+que transforma "costumam" em "estão". Se não der para casar, a saída é a rotina de offset em sombra
+total descrita na seção abaixo, que hoje está fora de escopo justamente porque casar componente é
+mais barato que carregar calibração.
 
 ## Os quatro LDRs precisam ser o mesmo componente
 

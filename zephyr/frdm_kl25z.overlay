@@ -3,8 +3,20 @@ status = "okay";
 };
 / {
     zephyr,user {
-        /* Conecta o canal 12 (PTB2) e 8 (PTB0) do adc0 ao nó de usuário */
-        io-channels = <&adc0 12>, <&adc0 8>;
+        /* ⚠️ A ORDEM desta lista E o indice do enum ldr_id_t (lib/ldr/ldr.h):
+               0 = LDR_ESQ   1 = LDR_DIR   2 = LDR_CIMA   3 = LDR_BAIXO
+           Mexeu na ordem aqui, mexa no enum la. Trocar duas entradas troca o
+           NOME dos sensores sem erro de compilacao nenhum, e o sintoma e o
+           painel virando para o lado errado.
+
+           O BUILD_ASSERT em ldr.c pega a QUANTIDADE de canais, nunca a ordem -
+           quem confere a ordem e o teste do dedo, no passo 1 do bringup.
+
+           Pinagem fisica: context/03-hardware_specs/01-plataforma-e-pinagem.md */
+        io-channels = <&adc0 8>,    /* PTB0 = A0 - SE8  - esquerda */
+                      <&adc0 12>,   /* PTB2 = A2 - SE12 - direita  */
+                      <&adc0 9>,    /* PTB1 = A1 - SE9  - cima     */
+                      <&adc0 13>;   /* PTB3 = A3 - SE13 - baixo    */
     };
 };
 
@@ -13,20 +25,52 @@ status = "okay";
     #address-cells = <1>;
     #size-cells = <0>;
 
-    /* Configuração interna para o canal 12 (LDR Direita) */
-    channel@c {
-        reg = <12>; /* Reg 0 (0xc) indica o canal analógico interno */
+    /* ⚠️ Nome do no em HEXADECIMAL, `reg` em DECIMAL: channel@c tem reg = <12>,
+       channel@d tem reg = <13>. Escrever channel@13 seria o canal 19. */
+
+    /* Canal 8 = pino EXTERNO PTB0 (ADC0_SE8) - LDR Esquerda.
+       Nao e "canal interno": interno na KL25Z e sensor de temperatura/bandgap. */
+    channel@8 {
+        reg = <8>;
         zephyr,gain = "ADC_GAIN_1";            /* Sem amplificação de ganho */
-        zephyr,reference = "ADC_REF_INTERNAL";      /* Utiliza a referência interna de tensão do chip (VREF) */
+        /* D-19: NAO usar ADC_REF_INTERNAL aqui. O driver adc_mcux_adc16 nunca
+           preenche ref_internal, entao adc_raw_to_millivolts_dt() devolveria
+           0 mV com codigo de SUCESSO e o tracker pararia sem reclamar.
+           A referencia de HARDWARE vem de Kconfig (VREFH/VREFL) e nao deste
+           campo - o channel_setup do driver ignora `reference`.
+           Vale para os QUATRO nos deste arquivo. */
+        zephyr,reference = "ADC_REF_EXTERNAL0";
+        zephyr,vref-mv = <3300>;
         zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
-        zephyr,resolution = <12>;               /* Define a amostragem em 12 bits (Valor lido de 0 a 4095) */
+        zephyr,resolution = <12>;               /* 12 bits: valor lido de 0 a 4095 */
     };
 
-    /* Configuração interna para o canal 8 (LDR Esquerda - Pino PTB0) */
-    channel@8 {
-        reg = <8>; /* Reg 8 (0x8) indica o canal analógico interno */
+    /* Canal 12 = pino EXTERNO PTB2 (ADC0_SE12) - LDR Direita. */
+    channel@c {
+        reg = <12>;
         zephyr,gain = "ADC_GAIN_1";
-        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,reference = "ADC_REF_EXTERNAL0";  /* D-19, ver acima */
+        zephyr,vref-mv = <3300>;
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <12>;
+    };
+
+    /* Canal 9 = pino EXTERNO PTB1 (ADC0_SE9) - LDR Cima. P-01 resolvido. */
+    channel@9 {
+        reg = <9>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_EXTERNAL0";  /* D-19, ver acima */
+        zephyr,vref-mv = <3300>;
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <12>;
+    };
+
+    /* Canal 13 = pino EXTERNO PTB3 (ADC0_SE13) - LDR Baixo. P-01 resolvido. */
+    channel@d {
+        reg = <13>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_EXTERNAL0";  /* D-19, ver acima */
+        zephyr,vref-mv = <3300>;
         zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
         zephyr,resolution = <12>;
     };

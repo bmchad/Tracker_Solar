@@ -1,6 +1,6 @@
 # LEIA PRIMEIRO — contexto do Tracker Solar
 
-Tracker solar de **dois eixos** rodando **Zephyr** numa **FRDM-KL25Z**. Dois servos SG90S movem
+Tracker solar de **dois eixos** rodando **Zephyr** numa **FRDM-KL25Z**. Dois servos MG90S movem
 uma placa: um no eixo horizontal (azimute), um no vertical (inclinação). LDRs ligados ao `ADC0`
 dizem para onde está o sol.
 

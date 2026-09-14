@@ -66,13 +66,17 @@ int main(void){
     servo_vertical_angulo_tempo(angulo, 1);
     int contador_vertical = 0;
 
-    //teste motores
+    /* D-06: os testes eram chamados sem condicao nenhuma e custavam
+       12 min 40 s de sono bloqueante em TODO boot, antes da primeira leitura de
+       tracking. Agora sao opt-in de compilacao - ver platformio.ini. */
+//#ifdef RODAR_TESTES_NO_BOOT
     teste_motores();
-    //teste ldr
-    teste_ldr();
-
-    printk("Testes terminados, começando o tracker...");
-
+    //teste_ldr();
+    //printk("Testes terminados, começando o tracker...\n");
+//#else
+    //printk("Tracker iniciando (testes desligados; -DRODAR_TESTES_NO_BOOT para ligar).\n");
+//#endif
+/*
     while(1){
         relogio_atualizar(); // Mantém o relógio preciso atualizando as variáveis globais hora_atual, etc.
         
@@ -88,8 +92,23 @@ int main(void){
             k_msleep(5000); // Dorme por 5 segundos antes de conferir o relógio de novo
             continue; // Pula toda a lógica do LDR
         }
-        valor_ldr_d[i] = ldr_ler('d'); // Le o LDR Direito
-        valor_ldr_e[i] = ldr_ler('e'); // Le o LDR Esquerdo
+           //D-01: erro separado do valor. Antes, uma falha de leitura devolvia
+           //-1.0, entrava no historico e VOTAVA - o firmware concluia que o sol
+           //estava do lado oposto e movia a placa por causa de um erro de
+           //barramento. Agora o ciclo inteiro e descartado.
+        int32_t mv_d = 0, mv_e = 0;
+        int err_d = ldr_ler('d', &mv_d); // Le o LDR Direito
+        int err_e = ldr_ler('e', &mv_e); // Le o LDR Esquerdo
+
+        if (err_d < 0 || err_e < 0) {
+            printk("Falha na leitura do LDR (dir=%d esq=%d); ciclo descartado.\n",
+                   err_d, err_e);
+            k_msleep(1000);
+            continue;
+        }
+
+        valor_ldr_d[i] = (double)mv_d;
+        valor_ldr_e[i] = (double)mv_e;
 
         i++; 
         if(i == LDR_HISTORY_SIZE) {
@@ -100,7 +119,12 @@ int main(void){
         if (buffer_cheio) {
             int certeza_esquerda = 0;
             int certeza_direita = 0;
-            double margem = 20.0; // Tolerância de millivolts para ignorar ruído
+               // D-03: agora isto E milivolts de verdade. Antes o valor lido era
+               // contagem bruta escalada por um fator arbitrario, e esta "margem
+               //de millivolts" era adimensional - nao havia multimetro que a
+               //conferisse. O numero em si continua sendo chute ate as medicoes
+               //de P-04.
+            double margem = 20.0; // Tolerância em mV para ignorar ruído
             
             // Varredura no histórico para confirmar a decisão (Filtro Anti-Samba Quadrático)
             for(int k = 0; k < LDR_HISTORY_SIZE; k++){
@@ -146,6 +170,9 @@ int main(void){
             buffer_cheio = 0;
             i = 0;
         }
+
+//aqui é ctrl c + ctrl v na lógica horizontal, e apagar a lógica com calcular theta
+
         if(contador_vertical == 0){
         theta = calcular_theta((double)(hora_atual + minuto_atual/60.0 + segundo_atual/3600.0), angulo);
         theta = arredondar_para_multiplo_de_5(theta);
@@ -157,6 +184,6 @@ int main(void){
         }
                 k_msleep(1000);
     }
-    
+    */
     return 0;
 }

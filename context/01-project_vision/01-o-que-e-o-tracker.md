@@ -6,7 +6,7 @@ sobre Zephyr que decide para onde ela vira.
 ## O hardware, em uma linha
 
 **FRDM-KL25Z** (Cortex-M0+, MKL25Z4, 48 MHz) + **Zephyr 3.4** (via PlatformIO,
-`platform_packages = platformio/framework-zephyr@~3.40200.0`) + **2 servos SG90S** em PWM por
+`platform_packages = platformio/framework-zephyr@~3.40200.0`) + **2 servos MG90S** em PWM por
 `TPM0` + **LDRs** em divisor de tensão lidos pelo `ADC0`.
 
 A pinagem completa é dona de [../03-hardware_specs/01-plataforma-e-pinagem.md](../03-hardware_specs/01-plataforma-e-pinagem.md).
@@ -21,7 +21,7 @@ A pinagem completa é dona de [../03-hardware_specs/01-plataforma-e-pinagem.md](
 5. Comanda os servos em passos pequenos e espera.
 
 Não há PID, não há velocidade: o controle é **posição incremental por passos** com zona morta.
-Isso é adequado ao problema — o sol se move 15°/h, e um servo SG90 não faz movimento suave de
+Isso é adequado ao problema — o sol se move 15°/h, e um servo MG90S não faz movimento suave de
 qualquer forma.
 
 ## O que ele deliberadamente NÃO é
@@ -37,7 +37,7 @@ firmware já assume cada uma:
   medida. Se o servo travar num obstáculo, o software não fica sabendo.
 - **Não há calibração medida dos servos.** O que existe são dois fatores empíricos encadeados
   (`1.21` no horizontal, `1.47` no vertical) que ninguém registrou como foram obtidos. Ver
-  [../03-hardware_specs/03-atuadores-sg90s.md](../03-hardware_specs/03-atuadores-sg90s.md) e **P-08**.
+  [../03-hardware_specs/03-atuadores-mg90s.md](../03-hardware_specs/03-atuadores-mg90s.md) e **P-08**.
 - **Não há persistência.** Nenhum parâmetro em flash: latitude, longitude, hora inicial e
   inclinação são `static` no código-fonte e mudar qualquer um exige recompilar e regravar.
 - **Não escreve em nada externo.** A única saída fora dos servos é `printk` na serial a 115200.

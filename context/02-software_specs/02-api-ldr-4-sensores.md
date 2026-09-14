@@ -2,6 +2,10 @@
 
 Arquivos: `lib/ldr/ldr.h`, `lib/ldr/ldr.c`
 
+> ✅ **IMPLEMENTADO em 2026-09-14.** O header e o `.c` no repositório já são os descritos aqui, e
+> compilam. O que saiu **diferente** da spec está na última seção — leia antes de tratar este texto
+> como descrição fiel do código.
+
 ## Por que a API quebra
 
 `double ldr_ler(char lado)` tem dois problemas que quatro sensores tornam insustentáveis:
@@ -157,3 +161,23 @@ bringup, onde ler um sensor por vez é justamente o objetivo.
 `sample_buffer` continua um `static` compartilhado. Fecha hoje porque há uma thread só, e passa a
 ser corrida no dia em que o controle virar thread própria — registrado como **D-37**, não resolvido
 aqui.
+
+## O que saiu diferente desta spec, na implementação
+
+Três coisas que o texto acima não previa, todas de 2026-09-14:
+
+1. ⭐ **`BUILD_ASSERT(DT_PROP_LEN(ADC_NODE, io_channels) == LDR_COUNT)`.** A spec dizia que nada no
+   build pega a divergência entre overlay e enum. Metade disso deixou de ser verdade: a
+   **quantidade** passa a ser erro de compilação. A **ordem** continua sem rede — só o teste do dedo
+   no passo 1 do bringup. Foi este assert que expôs o **D-43** (o `pio run` reusando um devicetree
+   antigo) como erro de build em vez de sensor mudo em campo.
+2. **`ler_canal()`, estático e sem nenhum `printk`.** A conversão de um canal virou função privada
+   sem log, e é o que permite a `ldr_ler_todos()` encostar as quatro leituras no tempo de verdade.
+   Quem loga é o chamador — `ldr_ler()` para o bringup, `ldr_ler_todos()` só no caminho de falha.
+3. **`ldr_ler_todos()` escreve num vetor temporário e copia no fim.** A spec pedia "falha inteiro se
+   um canal falhar"; retornar no meio do laço deixaria o vetor do chamador **meio preenchido**, com
+   valores novos ao lado de valores da varredura anterior — exatamente a mistura de instantes que a
+   função existe para impedir. Custa 16 bytes de pilha.
+
+E uma correção de rota que veio junto: **`ldr.c` não incluía `ldr.h`**. As assinaturas das
+definições nunca foram conferidas contra as declarações — a mesma família do **D-07**.

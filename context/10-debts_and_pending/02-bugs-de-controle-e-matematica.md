@@ -236,7 +236,11 @@ tem de ser o sensor. Ver
 
 ---
 
-## D-19 — `ADC_REF_INTERNAL` faz `adc_raw_to_millivolts_dt()` devolver 0 mV **com sucesso**
+## D-19 — `ADC_REF_INTERNAL` faz `adc_raw_to_millivolts_dt()` devolver 0 mV **com sucesso** ✅
+
+> ✅ **Corrigido em 2026-09-02**, junto com o D-03 — os dois são par indivisível. O overlay passou a
+> `zephyr,reference = "ADC_REF_EXTERNAL0"` e `zephyr,vref-mv = <3300>` nos dois nós de canal. Ver
+> [01-bugs-criticos.md](01-bugs-criticos.md). O diagnóstico abaixo fica como registro.
 
 **Onde:** `zephyr/frdm_kl25z.overlay` (os nós de canal) mais o consumidor a ser escrito em
 `lib/ldr/ldr.c`. É uma armadilha que **entra junto com a correção do D-03**, não um bug do código

@@ -22,8 +22,9 @@ Logo a mistura é subtração direta:
        *erro_h = (mv[SUP_ESQ] + mv[INF_ESQ]) - (mv[SUP_DIR] + mv[INF_DIR]);
        *erro_v = (mv[SUP_ESQ] + mv[SUP_DIR]) - (mv[INF_ESQ] + mv[INF_DIR]);
 
-   ⚠️ O SINAL depende da topologia do divisor (pull-up ou pull-down, P-03).
-   Assume-se pull-down: mais luz => mais tensão. Se for pull-up, inverta os dois. */
+   O SINAL depende da topologia do divisor, e ela está fechada (P-03): pull-down,
+   10 kOhm para GND e LDR para 3,3 V, logo mais luz => mais tensão e as duas
+   subtrações valem como estão. Se a montagem virar pull-up, inverta os dois. */
 static void controle_erros(const int32_t mv[LDR_COUNT], int32_t *erro_h, int32_t *erro_v)
 {
     *erro_h = mv[LDR_ESQ]  - mv[LDR_DIR];
@@ -92,7 +93,7 @@ Cada constante existe por um motivo distinto:
 - **`ZONA_MORTA_MV`** é o que impede o zig-zag. Sem ela o sistema persegue ruído para sempre. Foi o
   sintoma que o projeto anterior (o carrinho) nunca resolveu — o `README.MD` da raiz ainda o
   descreve.
-- **`PASSO_MIN_GRAUS`** existe porque um SG90 comandado a 1° de distância pode simplesmente não
+- **`PASSO_MIN_GRAUS`** existe porque um MG90S comandado a 1° de distância pode simplesmente não
   mover (folga da engrenagem), e o firmware então acredita que mexeu e não mexeu — sem encoder,
   ninguém desmente.
 - **`PASSO_MAX_GRAUS`** limita o dano de uma leitura absurda. Combinado com a mediana, é a segunda
@@ -123,8 +124,9 @@ if (alvo != atual) { servo_ir(eixo, alvo); }
 
 `servo_saturar()` mora em `lib/servo/` — os limites são propriedade mecânica do eixo, não do
 controle. Limites em
-[../03-hardware_specs/03-atuadores-sg90s.md](../03-hardware_specs/03-atuadores-sg90s.md), e o
-vertical depende de **P-06**.
+[../03-hardware_specs/03-atuadores-mg90s.md](../03-hardware_specs/03-atuadores-mg90s.md):
+horizontal 10°–170°, vertical **10°–160°** desde a resposta de **P-06** (provisório até P-08, porque
+o fator 1,47 encurta o ângulo comandado que alcança o fim de curso).
 
 ## Quando amostrar: no fim da espera, nunca durante o movimento
 

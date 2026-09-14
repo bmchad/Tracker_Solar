@@ -62,7 +62,7 @@ mudar o período de um muda o do outro.
 
 Ou seja: **`CnV = 375` é o mínimo de curso e `CnV = 750` o máximo**, e 1 grau vale
 (750 − 375) ÷ 180 ≈ 2,08 contagens — antes dos fatores de correção empírica, que são donos de
-[03-atuadores-sg90s.md](03-atuadores-sg90s.md).
+[03-atuadores-mg90s.md](03-atuadores-mg90s.md).
 
 `TPM_MODULE 7500` está **redefinido em quatro arquivos** (`src/main.c`, `lib/testes/testes.c`,
 `lib/servo_motor/servo_angulo_tempo.h` e por herança quem o inclui). Ver **D-34**.

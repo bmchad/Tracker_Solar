@@ -37,7 +37,11 @@ Um tracker de dois eixos quer a normal da placa apontada para o sol. Isso signif
 | Eixo | Alvo |
 |---|---|
 | vertical (inclinação β) | **β = 90° − α**, onde α é a **elevação solar** |
-| horizontal (azimute γ) | **γ = γ_s**, o **azimute solar** |
+| horizontal (azimute γ) | ~~**γ = γ_s**~~ — **não será usado como comando**, ver **DEC-13** |
+
+⚠️ **A linha do horizontal ficou teórica.** Com **DEC-13** o azimute é malha fechada pura: o par
+esquerda/direita comanda o eixo sozinho. γ_s continua sendo calculado — ele sai de graça do mesmo
+`atan2` — mas serve para log e para decidir dia/noite, nunca para posicionar.
 
 Ou seja: o que faltava não era um ângulo novo, era **a posição do sol** — que a biblioteca já tem
 todos os ingredientes para dar (declinação δ e ângulo horário ω já são calculados lá dentro, e
@@ -65,8 +69,8 @@ double gama_s = rad2deg(atan2(sen_omega,
 ⚠️ **`clamp_dominio()` é obrigatório**, e é a correção de **D-04**: `asin`/`acos` fora de
 [−1, +1] devolvem **NaN**, e converter NaN para `int` é comportamento **indefinido** em C. Erro de
 arredondamento em soma de senos e cossenos chega a passar de 1,0 por uma fração de LSB, e o
-resultado é um valor arbitrário chegando ao servo — que, no eixo vertical, hoje **não tem limite de
-curso** (**P-06**). A função clampa em [−1, +1] antes de qualquer `asin`/`acos`, e os dois usos
+resultado é um valor arbitrário chegando ao servo — que, no eixo vertical, só ganhou limite de
+curso com a resposta de **P-06** (10°–160°, provisório até P-08). A função clampa em [−1, +1] antes de qualquer `asin`/`acos`, e os dois usos
 atuais na linha do `omega_s` e do `cos_theta` também passam a usá-la.
 
 ## `calcular_theta()` fica — rebaixada a diagnóstico
@@ -82,7 +86,8 @@ double calcular_theta(double HL, double beta_real, double gama_real);
 ```
 
 Um θ que cai ao longo de uma manhã é um tracker convergindo. Um θ que sobe com o log dizendo que
-moveu é um problema de sinal (**P-03**) ou de calibração de servo (**P-08**).
+moveu é um problema de sinal (a montagem divergindo do pull-down de **P-03**) ou de calibração de
+servo (**P-08**).
 
 ## Os dois papéis do feedforward
 
@@ -90,14 +95,25 @@ O cálculo **não** comanda o eixo. Ele faz duas coisas que a malha do LDR não 
 
 ### 1. Posição de partida
 
-No boot e ao sair do modo noturno, a placa vai para `β = 90° − α` e `γ = γ_s` **antes** de a malha
-começar. Hoje ela vai para **0°** nos dois eixos, e 0° é uma posição arbitrária que pode estar a
-90° do sol — e, do fundo do poço, a malha do LDR não tem sinal nenhum para subir: com todos os
-quadrantes na sombra, os quatro valores são igualmente baixos, o erro é zero, e a zona morta
-manda ficar parado. **O tracker dorme e não acorda.**
+No boot e ao sair do modo noturno, o eixo vertical vai para `β = 90° − α` **antes** de a malha
+começar. Hoje ele vai para **0°**, uma posição arbitrária que pode estar a 90° do sol — e, do fundo
+do poço, a malha do LDR não tem sinal nenhum para subir: com todos os quadrantes na sombra, os
+quatro valores são igualmente baixos, o erro é zero, e a zona morta manda ficar parado. **O tracker
+dorme e não acorda.**
 
 Isso é o que o feedforward resolve: ele coloca a placa perto o bastante do sol para que exista
 gradiente, e a malha assume dali.
+
+⛔ **No horizontal esse papel ficou vago, e o risco não ficou.** Com **DEC-13** não há posição
+calculada de azimute, então o boot é em posição arbitrária no eixo que tem o maior curso — 160° de
+incerteza. O substituto acordado, e que não precisa de bússola nem de relógio:
+
+> **varrer 10° → 170° no boot, em passos grossos, e parar no ângulo de maior SOMA dos quatro LDRs.**
+
+A soma é a única grandeza que serve aqui: a **diferença** entre quadrantes é zero quando o sol está
+fora do ângulo de captura, mas a soma cresce monotonicamente na direção da luz. Ela usa os quatro
+LDRs como um fotômetro, não como um sensor de erro. Sem essa varredura, o "dorme e não acorda" que
+DEC-2 evitou no vertical volta inteiro no horizontal.
 
 ### 2. Envelope de sanidade
 
@@ -118,26 +134,31 @@ passa a ser o critério de dia e noite, substituindo o `hora_atual >= 18 || hora
 hoje. Um limiar de hora fixo está errado em qualquer época do ano fora do equinócio; a elevação
 solar já sabe quando o sol nasce naquela data e latitude.
 
-## O azimute do servo tem um offset de montagem
+## O azimute do servo NÃO ganha offset de montagem — DEC-13
 
-Comparar a posição do servo horizontal com o azimute solar exige saber **para onde aponta o servo
-em 0°**. Esse número não está em lugar nenhum do código hoje — é a raiz da terceira parte de
-**D-11**. A pergunta em aberto é **P-09**.
+Comparar a posição do servo horizontal com o azimute solar exigiria saber **para onde aponta o servo
+em 0°**. Esse número nunca esteve no código, era a pergunta **P-09**, e ela foi **encerrada**: o
+horizontal fica em malha fechada pura.
 
 ```c
-/* ⚠️ Propriedade da MONTAGEM FÍSICA, não do software.
-   Para que azimute (convenção Sul = 0) aponta a placa com o servo em 0 grau? */
-#define AZIMUTE_DO_SERVO_ZERO  (-90.0)   /* -90 = Leste. A CONFIRMAR na montagem */
-#define SENTIDO_SERVO          (+1)      /* +1 se aumentar o angulo vai para Oeste */
+/* NÃO EXISTE MAIS, e é decisão: ver DEC-13.
+   #define AZIMUTE_DO_SERVO_ZERO (-90.0)   <- fora do projeto
 
-/* graus de servo -> azimute, e a volta */
-azimute = AZIMUTE_DO_SERVO_ZERO + SENTIDO_SERVO * graus_servo;
+   O que permanece é a convenção de sentido, que o CONTROLE precisa e que não
+   depende de referencial nenhum do céu: qual sinal de passo gira para que lado. */
+#define SENTIDO_SERVO  (+1)   /* sai do passo 2 do bringup, sem bússola */
 ```
 
-Com o servo em 0° apontando para o Leste e 180° para o Oeste, um dia inteiro cabe no curso — que é
-a montagem natural para um tracker e provavelmente a que está na bancada. **Confirmar antes de
-implementar**; se `SENTIDO_SERVO` estiver invertido, o feedforward manda a placa para o lado oposto
-do sol na partida.
+⚠️ **O que a decisão deixa em aberto é o θ de diagnóstico.** `calcular_theta()` recebe `gama_p`, o
+azimute **da placa**, e sem o offset o que se pode passar é o grau mecânico — numa fórmula que
+espera a convenção Sul = 0. É a terceira parte de **D-11**, e ela não se fecha aqui. Duas saídas
+honestas, e a escolha é de quem implementar:
+
+- logar θ **só com a parcela vertical** honesta, deixando explícito que o azimute não entra;
+- ou logar θ inteiro com um comentário de que ele é **indicativo**, não métrica.
+
+⛔ **O que não é aceitável é passar grau mecânico como se fosse azimute e chamar o resultado de
+"qualidade do apontamento"** — seria o mesmo erro de referencial de D-11, com nome novo.
 
 ## Bug vizinho: o modo noturno mistura os eixos
 

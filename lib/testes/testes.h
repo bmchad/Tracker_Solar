@@ -1,11 +1,20 @@
-#include <zephyr/kernel.h>             // Funções básicas do Zephyr (ex: k_msleep, k_thread, etc.)
-#include <zephyr/device.h>             // API para obter e utilizar dispositivos do sistema
-#include <zephyr/drivers/gpio.h>       // API para controle de pinos de entrada/saída (GPIO)
-#include <pwm_z42.h>                // Biblioteca personalizada com funções de controle do TPM (Timer/PWM Module)
-#include <ldr.h>
-#include <init_hora.h>              // Biblioteca do relógio de software
-#include <angulo_incidencia_solar.h>
+#ifndef TESTES_H
+#define TESTES_H
 
-int teste_motores();
+/* D-02: estas rotinas NAO inicializam hardware.
+   Elas recebem TPM0 e o ADC ja prontos, porque quem inicializa e o main().
+   Antes cada uma repetia as mesmas cinco chamadas de pwm_tpm_Init /
+   pwm_tpm_Ch_Init / ldr_inicializar, e todo boot configurava o hardware tres
+   vezes. Nao era so redundancia: pwm_tpm_Init faz `tpm->SC |= ...`, um OR e
+   nao uma escrita, entao reinicializar com parametros DIFERENTES acumula bits
+   em vez de substituir. Passava por sorte porque os tres lugares pediam os
+   mesmos valores.
 
-int teste_ldr();
+   D-06: nao chame isto no caminho normal de boot. Ver RODAR_TESTES_NO_BOOT
+   no platformio.ini. */
+
+int teste_motores(void);
+
+int teste_ldr(void);
+
+#endif /* TESTES_H */

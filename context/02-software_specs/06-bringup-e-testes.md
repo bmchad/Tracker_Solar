@@ -68,13 +68,19 @@ O que se confirma aqui, e só aqui:
    certo. É o único teste da ordem de `io-channels` contra o `enum ldr_id_t` — divergência ali não
    produz erro de compilação nenhum (ver
    [01-devicetree-adc-4-canais.md](01-devicetree-adc-4-canais.md)).
-2. **Sinal do divisor** (**P-03**). Iluminar um quadrante: o valor dele tem de **subir** se for
-   pull-down. Se cair, a mistura do controle precisa dos sinais invertidos — e descobrir isso agora
-   custa um comentário, descobrir depois custa um servo.
+2. **Sinal do divisor** (**P-03**, respondida: pull-down de 10 kΩ). Iluminar um quadrante: o valor
+   dele tem de **subir**. Virou confirmação, não descoberta — e continua no roteiro porque custa
+   30 s e é o que pega uma montagem que divergiu do papel. Se cair, a mistura do controle precisa
+   dos sinais invertidos, e descobrir isso agora custa um comentário, descobrir depois custa um
+   servo.
 3. **Casamento dos quatro** — com os quatro na sombra, os valores têm de ser próximos. O
    espalhamento aqui é um erro **constante** que o controle vai ler como "o sol está daquele lado"
    para sempre.
-4. **As medições de P-04**, que calibram `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU`.
+4. **As medições que calibram `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU`.** **P-04** já deu a faixa
+   (10²–10³ mV, ver
+   [../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md](../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md)) —
+   o que **só** sai daqui é o piso de ruído no alvo, o espalhamento entre os quatro na sombra e o mV
+   por grau.
 
 ⭐ Deixar rodando 1 minuto com a placa parada: a **variação** dos valores é o piso de ruído, e
 `ZONA_MORTA_MV` tem de ficar acima dele. Este é o número que decide se haverá zig-zag.
@@ -84,8 +90,10 @@ O que se confirma aqui, e só aqui:
 `teste_motores()` com `NUMERO_DE_TESTES 1`. Confirma curso, sentido e alimentação:
 
 - os limites de curso param onde devem (nada de wrap — D-05 corrigido);
-- **qual sentido aumenta o ângulo** — é o que preenche `SENTIDO_SERVO` e
-  `AZIMUTE_DO_SERVO_ZERO` de [04-eixo-vertical-feedforward.md](04-eixo-vertical-feedforward.md);
+- **qual sentido aumenta o ângulo** — é o que preenche `SENTIDO_SERVO`. `AZIMUTE_DO_SERVO_ZERO`
+  saiu do projeto com **DEC-13** (nada de bússola aqui), mas o sentido continua importando: trocado,
+  a correção afasta a placa do sol em vez de aproximá-la. Ver
+  [04-eixo-vertical-feedforward.md](04-eixo-vertical-feedforward.md);
 - **o teste de acoplamento**, abaixo — é ele que responde **P-02** e **P-10**.
 
 #### ⭐ O teste de 3 passos: separa problema elétrico de problema de algoritmo

@@ -6,6 +6,15 @@ A pinagem física é dona de
 [../03-hardware_specs/01-plataforma-e-pinagem.md](../03-hardware_specs/01-plataforma-e-pinagem.md).
 Aqui só a tradução dela para o devicetree.
 
+> ✅ **IMPLEMENTADO em 2026-09-14.** O overlay no repositório já tem os quatro canais, na ordem
+> descrita abaixo, e o projeto compila (FLASH 19,97%, RAM 33,94%). O que segue deixou de ser
+> proposta e passou a descrever o que está no arquivo — com uma adição que a spec não previa: o
+> `BUILD_ASSERT` em `lib/ldr/ldr.c`, que confere a **quantidade** de `io-channels` contra
+> `LDR_COUNT` em tempo de compilação.
+>
+> ⛔ **Antes de concluir qualquer coisa a partir de um build seu: mexer neste arquivo NÃO regenera o
+> devicetree.** O `pio run` reusa o `.dts` já gerado. Apague `.pio/` inteiro — ver **D-43**.
+
 ## O contrato: a ordem de `io-channels`
 
 ⭐ **A ordem desta lista é o índice do `enum ldr_id_t`.** É o acoplamento mais fácil de quebrar
@@ -27,9 +36,10 @@ tracker passa a virar para o lado errado sem uma única mensagem de log.
 };
 ```
 
-⚠️ **Note que a ordem mudou em relação ao overlay atual**, onde a direita é o índice 0 e a
-esquerda o 1. O enum novo é alfabético-por-eixo (esq, dir, cima, baixo) e o overlay o segue. Quem
-implementar precisa mudar os **dois** de uma vez.
+⚠️ **A ordem mudou em relação ao overlay antigo**, onde a direita era o índice 0 e a esquerda o 1.
+O enum é alfabético-por-eixo (esq, dir, cima, baixo) e o overlay o segue. Os **dois** foram mudados
+juntos, em 2026-09-14, que é a única forma segura: mexer num lado só troca esquerda com direita sem
+erro de compilação nenhum.
 
 ## Os dois nós novos
 
@@ -64,11 +74,15 @@ apropriada.
 };
 ```
 
-⛔ **`zephyr,reference` e `zephyr,vref-mv` nos QUATRO nós, não só nos dois novos.** Os dois
-existentes estão em `ADC_REF_INTERNAL` hoje, e é isso que faz `adc_raw_to_millivolts_dt()` devolver
-**0 mV com código de sucesso** neste driver — ver **D-19**. Sem esta correção, a spec de
-[02-api-ldr-4-sensores.md](02-api-ldr-4-sensores.md) transforma o tracker num aparelho parado que
-não reclama.
+⛔ **`zephyr,reference` e `zephyr,vref-mv` nos QUATRO nós, não só nos dois novos** — e é assim que
+o arquivo está hoje. ⚠️ Esta seção afirmava, até 2026-09-14, que *"os dois existentes estão em
+`ADC_REF_INTERNAL` hoje"*: **estão em `ADC_REF_EXTERNAL0` desde a correção do D-19**, e a frase
+descrevia o mundo anterior a ela.
+
+O que continua valendo é o **motivo**, e ele é o que impede alguém de "simplificar" esses campos de
+volta: com `ADC_REF_INTERNAL`, `adc_raw_to_millivolts_dt()` devolve **0 mV com código de sucesso**
+neste driver, os quatro sensores leem zero, os dois erros ficam sempre nulos e o tracker não se
+move — sem erro, sem log. Ver **D-19**.
 
 ⭐ **Por que é seguro mexer na referência:** `mcux_adc16_channel_setup` **ignora**
 `channel_cfg->reference` — ele valida canal, tempo de aquisição, diferencial e ganho, e nada mais

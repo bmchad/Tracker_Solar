@@ -1,192 +1,227 @@
-# Bugs críticos
+# Bugs críticos — ✅ os sete corrigidos em 2026-09-02
 
 Os que quebram, travam ou corrompem a decisão do tracker. Índice e severidades em
 [00-indice.md](00-indice.md).
 
----
-
-## D-01 — `ldr_ler` devolve `-1.0` como se fosse leitura
-
-**Onde:** `lib/ldr/ldr.c:65,77,84` (os três `return -1.0`), consumido em `src/main.c:90-91`.
-
-```c
-} else {
-    printk("Lado invalido. Use 'e' ou 'd'.\n");
-    return -1.0;
-}
-```
-
-O erro e o valor voltam pelo **mesmo canal**, e `-1.0` é um `double` plausível de leitura baixa. O
-`main.c` não checa nada:
-
-```c
-valor_ldr_d[i] = ldr_ler('d');
-valor_ldr_e[i] = ldr_ler('e');
-```
-
-O `-1.0` entra no histórico e **entra na votação**. Um sensor que falha na leitura passa a "perder"
-todas as comparações contra o outro, e o firmware conclui que o sol está do lado oposto — move a
-placa por causa de um erro de barramento.
-
-**Correção:** separar erro de valor — `int ldr_ler(ldr_id_t, int32_t *mv_out)`. Spec em
-[../02-software_specs/02-api-ldr-4-sensores.md](../02-software_specs/02-api-ldr-4-sensores.md).
+> ⭐ **Estado: D-01 a D-07 corrigidos.** O diagnóstico de cada um fica preservado abaixo — ele é o
+> que explica *por que* a correção é essa, e impede que alguém "simplifique" de volta. Cada item
+> termina com **O que foi feito**.
+>
+> ⚠️ **Corrigido significa "escrito e verificado por análise", não "testado no hardware".** O que
+> foi e o que não foi verificado está na seção **Verificação**, no fim.
+>
+> ⛔ **O D-19 entrou junto**, apesar de morar em
+> [02-bugs-de-controle-e-matematica.md](02-bugs-de-controle-e-matematica.md): ele é **par
+> indivisível** com o D-03, e aplicar um sem o outro deixaria os sensores lendo 0 mV.
 
 ---
 
-## D-02 — TPM0 e ADC inicializados três vezes, com `|=`
+## D-01 — `ldr_ler` devolvia `-1.0` como se fosse leitura ✅
 
-**Onde:** `src/main.c:36-38,44` · `lib/testes/testes.c:19-21,27` · `lib/testes/testes.c:63-65,71`.
+**Onde era:** `lib/ldr/ldr.c:65,77,84` (os três `return -1.0`), consumido em `src/main.c:90-91`.
 
-As mesmas cinco chamadas aparecem copiadas em três lugares, então todo boot inicializa o hardware
-três vezes.
+O erro e o valor voltavam pelo **mesmo canal**, e `-1.0` é um `double` plausível de leitura baixa. O
+`main.c` não checava nada — atribuía o retorno direto ao histórico.
 
-A parte que passa de redundância a armadilha está em `lib/pwm/pwm_z42.c:31`:
+O `-1.0` entrava no histórico e **entrava na votação**. Um sensor que falhasse na leitura passava a
+"perder" todas as comparações contra o outro, e o firmware concluía que o sol estava do lado oposto
+— movia a placa por causa de um erro de barramento.
+
+**O que foi feito.** A assinatura passou a separar os dois canais:
+
+```c
+int ldr_ler(char lado, int32_t *mv_out);   /* 0 em sucesso, -errno em falha */
+```
+
+Em erro devolve `-errno` e **não toca** em `*mv_out`. No `main.c`, falha de qualquer um dos dois
+sensores **descarta o ciclo inteiro** (`continue`) em vez de contaminar o histórico.
+
+⚠️ O parâmetro continua sendo `char lado`, porque ainda há **dois** sensores. Ele vira `ldr_id_t`
+no upgrade de 4 LDRs — ver
+[../02-software_specs/02-api-ldr-4-sensores.md](../02-software_specs/02-api-ldr-4-sensores.md). O
+defeito que o D-01 descreve — erro indistinguível de valor — está fechado independentemente disso.
+
+---
+
+## D-02 — TPM0 e ADC inicializados três vezes, com `|=` ✅
+
+**Onde era:** `src/main.c:36-38,44` · `lib/testes/testes.c:19-21,27` · `lib/testes/testes.c:63-65,71`.
+
+As mesmas cinco chamadas apareciam copiadas em três lugares, então todo boot inicializava o
+hardware três vezes.
+
+A parte que passava de redundância a armadilha está em `lib/pwm/pwm_z42.c:31`:
 
 ```c
 tpm->SC |= TPM_SC_CMOD(clock_mode) | TPM_SC_PS(ps);
 ```
 
 É um **OR**, não uma escrita. Reinicializar com parâmetros **diferentes** não substitui a
-configuração: **acumula bits**, e o prescaler resultante não é nenhum dos dois pedidos —
-`PS_128` (7) sobre `PS_8` (3) dá 7, mas `PS_8` sobre `PS_128` também dá 7. Hoje ninguém percebe
-porque os três lugares pedem exatamente os mesmos valores. É uma armadilha armada, esperando o
-primeiro que mudar um deles.
+configuração: **acumula bits**, e o prescaler resultante não é nenhum dos dois pedidos.
 
-**Correção:** `main()` é o único que inicializa hardware; as rotinas de teste recebem pronto.
-Regra em
-[../02-software_specs/00-arquitetura-e-ordem-de-execucao.md](../02-software_specs/00-arquitetura-e-ordem-de-execucao.md).
+**O que foi feito.** `teste_motores()` e `teste_ldr()` não inicializam mais nada — recebem o
+hardware pronto, e `main()` é o único lugar que chama `pwm_tpm_Init` / `pwm_tpm_Ch_Init` /
+`ldr_inicializar`. A regra está em
+[../02-software_specs/00-arquitetura-e-ordem-de-execucao.md](../02-software_specs/00-arquitetura-e-ordem-de-execucao.md),
+e o `testes.h` a repete no topo, para quem for mexer lá.
+
+⚠️ **O `|=` do `pwm_z42.c` continua como está**, de propósito — **DEC-5**, não mexer na biblioteca
+de origem terceira. A armadilha foi **desarmada** (não há mais reinicialização), não consertada. Se
+alguém reintroduzir um segundo `pwm_tpm_Init` com parâmetros diferentes, ela volta.
 
 ---
 
-## D-03 — A "conversão para mV" não converte nada
+## D-03 — A "conversão para mV" não convertia nada ✅
 
-**Onde:** `lib/ldr/ldr.c:88-93`.
+**Onde era:** `lib/ldr/ldr.c:88-93`, na linha `millivolts = millivolts * 0.889;`.
 
-```c
-int32_t raw_value = sample_buffer[0];
-millivolts = raw_value;
-millivolts = millivolts * 0.889; //0.889 : valor arbitrario
-return (double)millivolts;
-```
+Três defeitos, e o comentário do próprio autor admitia o principal:
 
-Três defeitos, e o comentário do próprio autor admite o principal:
-
-1. A variável se chama `millivolts` e carrega **contagem bruta escalada**. Ninguém converteu nada.
-2. O fator é declaradamente arbitrário. A escala correta para 12 bits sobre 3,3 V é
+1. A variável se chamava `millivolts` e carregava **contagem bruta escalada**. Ninguém convertia
+   nada.
+2. O fator era declaradamente arbitrário. A escala correta para 12 bits sobre 3,3 V é
    3300 ÷ 4095 ≈ **0,806**, não 0,889.
-3. `millivolts` é `int32_t`: a multiplicação por `double` **trunca** de volta para inteiro, então
-   até o fator errado é aplicado com perda.
+3. `millivolts` era `int32_t`: a multiplicação por `double` **truncava** de volta para inteiro.
 
-⛔ **A consequência é a que importa:** `src/main.c:102` declara
-`double margem = 20.0; // Tolerância de millivolts para ignorar ruído`. Essa margem **não está em
-milivolts**. É um número adimensional, não calibrável contra nenhuma medição de multímetro, e é o
-único limiar que separa "mover" de "ficar parado". Todo ajuste de anti-zig-zag feito nele foi feito
-às cegas.
+⛔ **A consequência era a que importa:** a `margem` do `main.c`, comentada como "tolerância de
+millivolts para ignorar ruído", **não estava em milivolts**. Era um número adimensional, não
+calibrável contra nenhuma medição de multímetro, e era o único limiar que separava "mover" de
+"ficar parado".
 
-**Correção:** `adc_raw_to_millivolts_dt()`, que o Zephyr já oferece e usa a referência declarada no
-devicetree. Ver
-[../02-software_specs/02-api-ldr-4-sensores.md](../02-software_specs/02-api-ldr-4-sensores.md).
+**O que foi feito.** `adc_raw_to_millivolts_dt()`, que usa a referência e o ganho declarados no
+devicetree. O comentário da `margem` no `main.c` passou a registrar que agora ela **é** mV de
+verdade — o valor `20.0` em si continua sendo chute até as medições do passo 1 do bringup (**P-04**
+deu a faixa, 10²–10³ mV, mas não o piso de ruído, que é o que este limiar tem de superar).
 
-⛔ **Leia o D-19 antes de escrever essa linha.** Com o overlay como está
-(`zephyr,reference = "ADC_REF_INTERNAL"`), essa função devolve **0 mV com código de sucesso** neste
-driver, e o tracker para de se mexer sem reclamar. A correção do D-03 é **par indivisível** com a
-correção do overlay do D-19 — aplicar uma sozinha é pior que não aplicar nenhuma.
+⛔ **Não dava para fazer sozinho** — ver D-19, logo abaixo.
 
 ---
 
-## D-04 — `acos`/`asin` sem clamp de domínio: NaN, e depois UB
+## D-19 — o overlay, par indivisível do D-03 ✅
 
-**Onde:** `lib/angulo_incidência_solar/angulo_incidencia_solar.c:110` e `:134`.
+Mora em [02-bugs-de-controle-e-matematica.md](02-bugs-de-controle-e-matematica.md), mas foi
+corrigido nesta mesma leva porque não faz sentido separá-los.
 
-```c
-double cos_ws = -tan(deg2rad(phi)) * tan(deg2rad(delta));
-double omega_s = rad2deg(acos(cos_ws));            /* linha 110 */
-...
-double cos_theta = termo1 + termo2 + termo3 + termo4 + termo5;
-double theta = rad2deg(acos(cos_theta));           /* linha 134 */
-```
+`adc_raw_to_millivolts_dt()` com `zephyr,reference = "ADC_REF_INTERNAL"` devolvia **0 mV com código
+de sucesso** neste driver, porque `adc_mcux_adc16.c` nunca preenche `ref_internal`. Aplicar só o
+D-03 teria deixado os sensores lendo zero, os erros sempre nulos e o tracker parado **sem uma linha
+de log** — indistinguível de "está escuro".
 
-Nenhum dos dois argumentos é garantido estar em [−1, +1]:
+**O que foi feito.** Nos dois nós de canal do `zephyr/frdm_kl25z.overlay`:
+`zephyr,reference = "ADC_REF_EXTERNAL0"` e `zephyr,vref-mv = <3300>`. Seguro porque
+`mcux_adc16_channel_setup` **ignora** o campo `reference` — a referência de hardware vem de Kconfig
+(VREFH/VREFL), não do devicetree. Corrigido de passagem o comentário que chamava PTB2/PTB0 de
+"canal analógico interno" (**D-18**).
 
-- **linha 110:** `-tan(φ)tan(δ)` passa de 1 em módulo em latitude alta — é o caso do sol que não
+---
+
+## D-04 — `acos` sem clamp de domínio: NaN, e depois UB ✅
+
+**Onde era:** `lib/angulo_incidência_solar/angulo_incidencia_solar.c:110` e `:134`.
+
+Nenhum dos dois argumentos era garantido estar em [−1, +1]:
+
+- **linha 110:** `-tan(φ)tan(δ)` passa de 1 em módulo em latitude alta — o caso do sol que não
   nasce ou não se põe. Não acontece em −23,5°, mas o valor é `static` e editável.
 - **linha 134:** é uma **soma de cinco produtos** de senos e cossenos. Erro de arredondamento
   acumulado passa de 1,0 por uma fração de LSB perto do apontamento perfeito — exatamente onde um
   tracker que funciona vive.
 
-`acos` fora do domínio devolve **NaN**. E então, em `src/main.c:151`:
+`acos` fora do domínio devolve **NaN**, e converter NaN para `int` é comportamento **indefinido**
+em C. Combinado com **D-05** e com a ausência de limite de curso no vertical (**P-06**, respondida
+depois: 10°–160° provisório), o modo de falha era **mecânico**.
 
-```c
-servo_vertical_angulo_tempo((int)theta, 2);
-```
-
-⛔ **Converter NaN para `int` é comportamento indefinido em C.** No ARM o resultado costuma ser 0 ou
-`INT_MIN`, mas não há garantia. Combinado com **D-05** (que envolve em vez de saturar) e com a
-ausência de limite de curso no eixo vertical (**P-06**), o modo de falha é **mecânico**.
-
-**Correção:** clampar em [−1, +1] antes de todo `asin`/`acos`. Spec em
+**O que foi feito.** Uma função `clamp_dominio()` que satura em [−1, +1], aplicada nos **dois**
+`acos`. Está exportada no header de propósito: a spec do feedforward vai precisar dela também no
+`asin` da elevação solar — ver
 [../02-software_specs/04-eixo-vertical-feedforward.md](../02-software_specs/04-eixo-vertical-feedforward.md).
 
 ---
 
-## D-05 — O servo **envolve** o ângulo em vez de saturar
+## D-05 — O servo **envolvia** o ângulo em vez de saturar ✅
 
-**Onde:** `lib/servo_motor/sevo_angulo_tenpo.c:21-26` e `:33-38` (as duas funções, idênticas).
+**Onde era:** `lib/servo_motor/sevo_angulo_tenpo.c:21-26` e `:33-38` (as duas funções, idênticas).
 
 ```c
 while(ang>180){ ang-=180; }
 while(ang<0)  { ang+=180; }
 ```
 
-Pedir **185° entrega 5°**. Pedir **−10° entrega 170°**.
+Pedir **185° entregava 5°**. Pedir **−10° entregava 170°**. Uma ordem que deveria parar no fim de
+curso mandava a placa para o **extremo oposto**, com força total e sem aviso. Um controle
+incremental como este pede ângulo fora de faixa naturalmente, na borda da correção.
 
-Uma ordem que deveria parar no fim de curso manda a placa para o **extremo oposto**, com força
-total e sem aviso. Um controle incremental como este pede ângulos fora de faixa naturalmente — é o
-que acontece na borda da correção — e a resposta correta a "vá para 185°" é "vou para 170° e paro",
-nunca "vou para 5°".
+**O que foi feito.** Uma `servo_saturar()` estática substituiu os dois laços, nas duas funções.
 
-**Correção:** saturar. Ver
-[../02-software_specs/05-camada-servo-e-calibracao.md](../02-software_specs/05-camada-servo-e-calibracao.md).
-
----
-
-## D-06 — 12 min 40 s de teste bloqueante em todo boot
-
-**Onde:** `src/main.c:69-71`, com `NUMERO_DE_TESTES 10` em `lib/testes/testes.c:14`.
-
-```c
-//teste motores
-teste_motores();
-//teste ldr
-teste_ldr();
-```
-
-Sem condição nenhuma. `teste_motores()` faz 10 × 4 varreduras × 19 passos = **760** comandos de
-servo, cada um com `k_msleep(1000)` dentro (D-14). São **12 minutos e 40 segundos** antes de a
-primeira leitura de tracking acontecer, mais ~5 s de `teste_ldr()`.
-
-Não é incômodo de desenvolvimento: um reset ao meio-dia custa 12 minutos de sol, e nesse intervalo
-a placa está varrendo de 0 a 180 repetidamente, sem relação alguma com onde o sol está.
-
-**Correção:** `#ifdef RODAR_TESTES_NO_BOOT` com a flag em `platformio.ini`, e
-`NUMERO_DE_TESTES` de 10 para 1. Ver
-[../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md).
+⚠️ **Os limites são `[0, 180]`** — o curso mecânico do próprio servo. É o mínimo que fecha o
+defeito: nenhum pedido fora de faixa vira o extremo oposto. Os limites **por eixo** são outra
+questão: o horizontal tem `[10, 170]` no `main.c`, e o vertical passou a ter `[10, 160]` com a
+resposta de **P-06** — não há batente de montagem, o batente é o fim de curso do próprio servo, e
+`[0, 180]` **não** protege porque o fator 1,47 leva 180° comandados a 2,47 ms de pulso.
 
 ---
 
-## D-07 — `testes.c` chama as funções de servo sem incluir o header
+## D-06 — 12 min 40 s de teste bloqueante em todo boot ✅
 
-**Onde:** `lib/testes/testes.c` — inclui `pwm_z42.h`, `ldr.h`, `init_hora.h`,
-`angulo_incidencia_solar.h` e `testes.h`, mas **não** `servo_angulo_tempo.h`. E chama
-`servo_horizontal_angulo_tempo()` e `servo_vertical_angulo_tempo()` nas linhas 40, 44, 49 e 53.
+**Onde era:** `src/main.c:69-71`, com `NUMERO_DE_TESTES 10` em `lib/testes/testes.c:14`.
 
-Declaração implícita de função: o compilador assume `int f()` com argumentos promovidos. Aqui passa
-por sorte — os dois parâmetros são `int` e o retorno é ignorado. Se algum dia um deles virar
-`double` (e `t`, que é tempo, é o candidato natural), a chamada passa os bits errados **sem erro de
-compilação**.
+Sem condição nenhuma. `teste_motores()` fazia 10 × 4 varreduras × 19 passos = **760** comandos de
+servo, cada um com `k_msleep(1000)` dentro (D-14): **12 minutos e 40 segundos** antes da primeira
+leitura de tracking. Um reset ao meio-dia custava 12 minutos de sol, varrendo de 0 a 180 sem
+relação nenhuma com onde o sol está.
 
-Removida do C23, e já `-Werror=implicit-function-declaration` por padrão em compiladores recentes:
-é o tipo de coisa que quebra o build numa atualização de toolchain, não numa mudança de código.
+**O que foi feito.** Duas coisas:
 
-**Correção:** incluir o header. Ver
-[../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md).
+1. as chamadas foram para dentro de `#ifdef RODAR_TESTES_NO_BOOT`, e a flag está **comentada** no
+   `platformio.ini` — desligada por padrão, com a linha pronta para descomentar no bringup;
+2. `NUMERO_DE_TESTES` caiu de 10 para **1**. Dez repetições idênticas não revelam nada que a
+   primeira não revele.
+
+Sem a flag, o boot imprime uma linha dizendo que os testes estão desligados e entra direto no laço.
+
+---
+
+## D-07 — `testes.c` chamava as funções de servo sem incluir o header ✅
+
+**Onde era:** `lib/testes/testes.c` incluía `pwm_z42.h`, `ldr.h`, `init_hora.h`,
+`angulo_incidencia_solar.h` e `testes.h`, mas **não** `servo_angulo_tempo.h` — e chamava
+`servo_horizontal_angulo_tempo()` / `servo_vertical_angulo_tempo()` em quatro linhas.
+
+Declaração implícita: o compilador assumia `int f()` e **parava de conferir os argumentos**. Passava
+por sorte, porque os dois parâmetros são `int`. Removida do C23, e já
+`-Werror=implicit-function-declaration` por padrão em compiladores recentes — é o tipo de coisa que
+quebra o build numa atualização de toolchain, não numa mudança de código.
+
+**O que foi feito.** O `#include` acrescentado, e o `testes.h` ganhou include guard de passagem
+(parte do **D-34**, que continua aberto para os outros headers).
+
+---
+
+## Verificação
+
+O que **foi** verificado:
+
+| Verificação | Resultado |
+|---|---|
+| `arm-none-eabi-gcc -fsyntax-only` nas quatro fontes tocadas, com os **flags e includes reais** do Zephyr extraídos do `compile_commands.json` | ✅ passa |
+| `angulo_incidencia_solar.c` compilado isolado, com `-Wall -Wextra` | ✅ sem erro |
+| Varredura de literais de string quebrados, e balanceamento de chaves e parênteses | ✅ zero |
+| `ADC_REF_EXTERNAL0` e `zephyr,vref-mv` são valores válidos da binding do ADC | ✅ conferido em `dts/bindings/adc/adc-controller.yaml` |
+
+⛔ **O que NÃO foi verificado, e importa:**
+
+- ~~**O projeto não linka nesta máquina.**~~ **Destravado em 2026-09-14** — era cache de build com
+  duas grafias do mesmo caminho, não o Zephyr nem o código. O projeto **compila**: `firmware.elf` e
+  `firmware.bin` gerados com Zephyr 4.2.0 e GCC 8.2.1. Ver **D-40**, que guarda a receita e a
+  armadilha da primeira passada de configure.
+- **Nada foi testado em hardware.** Nenhuma destas correções foi observada rodando.
+- Os avisos que sobram são **pré-existentes e já catalogados**: `direcao` não usado em `main.c` e
+  `N` não usado em `angulo_incidencia_solar.c`, ambos **D-35**.
+
+## O que deliberadamente não entrou
+
+- **Os bugs de controle e matemática** (D-10 a D-18) continuam abertos. Vários deles — o filtro
+  quadrático, o θ usado como posição do servo — só fazem sentido corrigir junto com o upgrade de
+  4 LDRs, cujas specs estão em [../02-software_specs/](../02-software_specs/).
+- **O upgrade de 4 LDRs em si.** O código continua com dois sensores.
+- **`pwm_z42.c`**, intocado por **DEC-5**.
