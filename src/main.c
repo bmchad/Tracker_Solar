@@ -39,10 +39,17 @@ deixou de ser chamado. Ver o comentario no fim deste arquivo.
 
 #define AMOSTRAS          5   /* impar, para a mediana nao precisar de media   */
 
-#define MARGEM_MV        60   /* diferenca abaixo disto e ruido/nuvem         */
+#define MARGEM_MV        300   /* diferenca abaixo disto e ruido/nuvem         */
 
-#define PASSO_MS        100   /* passo fixo. graus = PASSO_MS * omega / 1000, */
-                              /* ou ~12 graus com omega = 60 graus/s          */
+/* Passo fixo, em TEMPO porque o servo e de rotacao continua e o comando real e
+   duracao, nao angulo. Quantos graus ele vale:
+
+       graus = PASSO_MS * omega / 1000
+
+   com omega saindo de VELOCIDADE_PCT em sevo_motor.c. ⚠️ O valor em graus NAO
+   fica anotado aqui de proposito: este parametro esta em ajuste ativo, e
+   comentario que cita valor derivado vira mentira no proximo build. */
+#define PASSO_MS        50
 
 /* ⛔ Passo abaixo do minimo da camada faria o tracker NUNCA mover, e em
    silencio: mover() recusaria todo comando e devolveria 0 para sempre. Pega em

@@ -38,10 +38,14 @@ typedef enum {
    deriva de PASSO_CNV em vez de copia-lo.
 
    ⚠️ Multiplicado por omega, este numero E o PASSO MINIMO do eixo: nenhuma
-   correcao mais fina que ele existe. Com omega de 60 graus/s sao 9 graus, e e
-   esse piso que obriga o controle a ter zona morta maior que ele. Ver o .c
-   sobre por que comando curto demais mente para a odometria. */
-#define SERVO_MS_MIN   100
+   correcao mais fina que ele existe. E, por isso, o piso de PASSO_MS no
+   controle - o BUILD_ASSERT em main.c trava a relacao entre os dois.
+
+   ⚠️ Quanto ele vale em graus NAO fica anotado aqui: e parametro em ajuste
+   ativo, e comentario que cita valor derivado envelhece a cada build. A conta e
+   SERVO_MS_MIN * omega / 1000. Ver o .c sobre por que comando curto demais
+   mente para a odometria. */
+#define SERVO_MS_MIN   50
 
 /* Gira no sentido dado, em VELOCIDADE FIXA, por `ms` milissegundos, e para.
    Bloqueante.
