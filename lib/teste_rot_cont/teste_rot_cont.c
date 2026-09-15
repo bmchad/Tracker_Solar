@@ -2,7 +2,7 @@
 #include <zephyr/sys/printk.h>
 #include <pwm_z42.h>
 #include <servo_motor.h>       /* a camada: usada SO pela medicao de posicao */
-#include <teste_portas.h>      /* recibo de gravacao e controle do LED */
+#include <pisca_led.h>          /* o LED da placa como indicador de fase */
 #include <teste_rot_cont.h>
 
 /* ---------------------------------------------------------------------------
@@ -51,6 +51,25 @@ static void aplicar(const char *rotulo, uint16_t cnv)
     k_msleep(DEGRAU_MS);
 }
 
+/* ⭐ RECIBO DE GRAVACAO: tres piscadas rapidas na cor desta gravacao.
+
+   Mora AQUI, e nao em pisca_led/, porque a biblioteca do LED tem uma funcao
+   publica so - ela segura um nivel, e piscar e um gesto de quem chama. Os dois
+   testes deste arquivo usam, entao vale uma definicao em vez de dois lacos
+   copiados.
+
+   ⚠️ Se a cor nao mudou depois de gravar, o upload NAO chegou ao alvo. Trocar
+   COR_DESTA_GRAVACAO em pisca_led.h e o unico passo do ritual. */
+static void recibo(void)
+{
+    for (int i = 0; i < 3; i++) {
+        led(COR_DESTA_GRAVACAO);
+        k_msleep(250);
+        led(LED_APAGADO);
+        k_msleep(250);
+    }
+}
+
 void teste_rot_cont(void)
 {
     printk("\n=== TESTE DE ROTACAO CONTINUA ===\n");
@@ -59,16 +78,16 @@ void teste_rot_cont(void)
     printk("Se o eixo nao girar, suba VELOCIDADE_PCT: percentual baixo cai\n"
            "dentro da zona morta de muitos servos.\n\n");
 
-    teste_portas_recibo();   /* pisca o LED: prova que esta gravacao chegou */
+    recibo();   /* pisca o LED: prova que esta gravacao chegou */
 
     for (;;) {
-        teste_portas_led(1);
+        led(COR_DESTA_GRAVACAO);
         aplicar("sentido A, devagar",  CNV_SENTIDO_A);
-        teste_portas_led(0);
+        led(LED_APAGADO);
         aplicar("parado (neutro)",     CNV_NEUTRO);
-        teste_portas_led(1);
+        led(COR_DESTA_GRAVACAO);
         aplicar("sentido B, devagar",  CNV_SENTIDO_B);
-        teste_portas_led(0);
+        led(LED_APAGADO);
         aplicar("parado (neutro)",     CNV_NEUTRO);
     }
 }
@@ -93,16 +112,16 @@ static void medir_um(const char *eixo, uint16_t canal,
 {
     printk("\n[omega] %s / %s: MARQUE a posicao agora (%d s)\n",
            eixo, sentido, OMEGA_MS_PAUSA / 1000);
-    teste_portas_led(0);
+    led(LED_APAGADO);
     k_msleep(OMEGA_MS_PAUSA);
 
     printk("[omega] %s / %s: GIRANDO por %d s...\n",
            eixo, sentido, OMEGA_MS_GIRO / 1000);
-    teste_portas_led(1);
+    led(COR_DESTA_GRAVACAO);
     pwm_tpm_CnV(TPM0, canal, cnv);
     k_msleep(OMEGA_MS_GIRO);
     pwm_tpm_CnV(TPM0, canal, CNV_NEUTRO);
-    teste_portas_led(0);
+    led(LED_APAGADO);
 
     printk("[omega] %s / %s: PARADO. Meca o varrido; omega = angulo / %d s\n",
            eixo, sentido, OMEGA_MS_GIRO / 1000);
@@ -115,7 +134,7 @@ void teste_rot_cont_medir_omega(void)
     printk("Sao QUATRO numeros: cada eixo em cada sentido - servo de rotacao\n");
     printk("continua e assimetrico, e um omega so embute erro que acumula.\n");
 
-    teste_portas_recibo();
+    recibo();
 
     for (;;) {
         medir_um("horizontal", CANAL_HORIZONTAL, "sentido A",
@@ -151,7 +170,7 @@ static int varrer(const char *eixo, const char *sentido, servo_dir_t dir,
     int comandos = 0;
 
     printk("[posicao] %s: varrendo no %s\n", eixo, sentido);
-    teste_portas_led(1);
+    led(COR_DESTA_GRAVACAO);
 
     for (int i = 0; i < POSICAO_MAX_PASSOS; i++) {
         uint32_t aplicado = mover(dir, POSICAO_PASSO_MS);
@@ -174,7 +193,7 @@ static int varrer(const char *eixo, const char *sentido, servo_dir_t dir,
                POSICAO_MAX_PASSOS);
     }
 
-    teste_portas_led(0);
+    led(LED_APAGADO);
     k_msleep(POSICAO_PAUSA_MS);
     return comandos;
 }

@@ -4,10 +4,14 @@ Retrato da investigação para a próxima sessão. **Não é spec nem decisão**
 o que sobrar de durável migra para `10-debts_and_pending/` ou `20-decisoes.md` e este arquivo é
 apagado.
 
-## ⛔ ANTES DE QUALQUER COISA
+## Estado do repositório
 
-**Nada está commitado.** O último commit é `91b27a9`. Dois dias de trabalho — camada de servo nova,
-arranjo em cruz, quatro testes de bancada, e todo este `context/` — existem só na árvore de trabalho.
+⭐ **Os dois dias de trabalho ESTÃO commitados**, em `a411ae6` — camada de servo nova, arranjo em
+cruz, quatro testes de bancada e todo este `context/`. (Este arquivo dizia o contrário, apontando
+para `91b27a9`; ficou desatualizado no instante do commit.)
+
+Fora do git continuam só as mudanças em curso: `lib/pisca_led/` (a antiga `lib/teste_portas/`,
+reduzida a uma função `led(cor)`) e `lib/teste_console/`.
 
 ---
 
@@ -105,6 +109,7 @@ seria medir a suposição.
 - **D-40**: build travado por cache com duas grafias do mesmo caminho — resolvido, mas a receita é
   apagar `.pio/` inteiro, não `fullclean`;
 - **D-43**: mexer no overlay **não** regenera o devicetree. Apague `.pio/`;
-- ⭐ **recibo de gravação**: `LED_DO_TESTE` em `teste_portas.c` — troque a cor a cada build. Se a
+- ⭐ **recibo de gravação**: `COR_DESTA_GRAVACAO` em `lib/pisca_led/pisca_led.h` — troque a cor a
+  cada build; `main()` acende o LED nela como primeira instrução. Se a
   placa não mudar de cor, o upload não chegou. Numa das máquinas nenhum upload chegava, com o
   terminal dizendo sucesso.

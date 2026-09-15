@@ -18,8 +18,8 @@ ainda se chama `carrinho1` (`zephyr/CMakeLists.txt`), e existe um repositório g
 `src/.git`. Está catalogado em
 [10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md](10-debts_and_pending/04-dividas-de-projeto-e-repositorio.md).
 ⭐ O `README.md` da raiz **já foi reescrito** e descreve o tracker — essa parte do **D-33** está
-resolvida, e o **D-30** (código fora do git) também: hoje só `lib/teste_portas/teste_portas.c` tem
-alteração pendente.
+resolvida, e o **D-30** (código fora do git) também — tudo o que havia de pendente entrou em
+`a411ae6`.
 
 ---
 

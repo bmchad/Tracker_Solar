@@ -23,8 +23,9 @@ PARALELA AO SOLO E ALINHADA COM O EQUADOR
 #include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
 #include <servo_motor.h>
 #include <teste_ldr.h>
-#include <teste_portas.h>
+#include <pisca_led.h>
 #include <teste_rot_cont.h>
+#include <teste_console.h>
 
 // Para um clock de 48 MHz e prescaler de 128 (PS_128), a frequência do timer é 375 kHz.
 // Para um período de 20ms (50Hz), TPM_MODULE (MOD) deve ser 7500.
@@ -39,7 +40,17 @@ PARALELA AO SOLO E ALINHADA COM O EQUADOR
 //função principal
 int main(void){
 
-    //teste_portas_servo(); //teste do tpm e das portas usadas na placa
+    /* ⭐ RECIBO DE GRAVACAO, e e a PRIMEIRA coisa que main() faz de proposito:
+       acende o LED na cor desta build e deixa aceso. Se a placa nao mudar de
+       cor depois de gravar, o upload NAO chegou ao alvo - troque
+       COR_DESTA_GRAVACAO em pisca_led.h a cada build.
+
+       ⚠️ Vem ANTES de teste_console(), que e laco infinito: quando a serial
+       esta muda, o LED e a unica prova de que este firmware e o novo. Foi
+       exatamente essa duvida que custou o dia 2026-09-14 inteiro. */
+    led(COR_DESTA_GRAVACAO);
+
+    teste_console(0); //teste_console(tentaivas), onde tentativa = 0 é infinito
 
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);

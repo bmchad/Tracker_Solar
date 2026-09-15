@@ -159,11 +159,25 @@ opcional.
 não mudou, a gravação não chegou ao alvo — e você descobre isso em dois segundos, em vez de passar
 horas medindo sintomas de um firmware que nunca subiu.
 
-O mecanismo está em `lib/teste_portas/teste_portas.c`, numa constante única:
+O mecanismo está em `lib/pisca_led/pisca_led.h`, numa constante única:
 
 ```c
-#define LED_DO_TESTE  0   /* 0 = VERDE (led0)  1 = AZUL (led1)  2 = VERMELHO (led2) */
+#define COR_DESTA_GRAVACAO  LED_AZUL   /* LED_VERDE | LED_AZUL | LED_VERMELHO */
 ```
+
+`src/main.c` chama `led(COR_DESTA_GRAVACAO)` como **primeira** instrução de `main()`, e o LED fica
+aceso. Editar essa linha e regravar é o ritual inteiro.
+
+⚠️ **O número do alias não segue a ordem das cores:** o verde é `led0` (PTB19), o azul é `led1`
+(PTD1) e o vermelho é `led2` (PTB18). Os três são ativos em nível baixo, e é por isso que
+`lib/pisca_led/` usa as variantes `_dt` das funções de GPIO — elas aplicam a inversão declarada no
+devicetree sozinhas.
+
+⭐ **`led(cor)` acende e SEGURA, não pisca** — e isso é desenho, não descuido. O nível segurado é o
+que permite usar o LED como **cronômetro** de um protocolo de bancada: em
+`teste_rot_cont_medir_omega()` o LED apagado significa "marque a posição agora" por 8 s e o aceso
+significa "girando" por 5 s. Uma piscada não consegue dizer "continue marcando". Quem quiser piscar
+monta o laço (é o que o `recibo()` de `teste_rot_cont.c` faz).
 
 ⛔ **Por que isso existe:** em 2026-09-14 **nenhuma** gravação de uma das máquinas chegou ao alvo,
 enquanto o terminal dizia `Firmware has been successfully uploaded` e o DAPLink não escrevia
@@ -175,6 +189,27 @@ binário, na mesma placa, gravado de outro computador, funcionou na hora.
 consumido e o log dizer sucesso são trabalho do **OpenSDA**, um segundo microcontrolador na própria
 placa. Só algo que **mude visivelmente no alvo** prova gravação — e a cor do LED é a forma mais
 barata disso.
+
+## A escada de 4 fases — apagada, e o que ela ensinou
+
+⛔ **`lib/teste_portas/` foi apagada em 2026-09-15**, quando a biblioteca virou `lib/pisca_led/` com
+uma função só. A escada de diagnóstico de pino que morava lá (`teste_portas_servo()`) já não tinha
+chamador vivo, e o código está preservado no commit `a411ae6`. O que ela ensinou, e que só existia
+nos comentários dela, fica aqui:
+
+1. **A ordem das fases, cada uma eliminando um suspeito diferente:** LED piscando (o firmware está
+   vivo?) → PTD3/PTD0 como GPIO em nível alto e baixo (o pino, o mux e o **jumper**) → PWM com duty
+   grosso de 0 / 50 / 100 % (o TPM0 em si) → pulso de servo real (o eixo anda, ou não anda).
+2. ⛔ **A fase de duty grosso só roda com o servo DESCONECTADO.** 50 % e 100 % não são pulso de
+   servo válido: ele zumbe contra o batente sem obedecer, e o teste passa a medir o servo errado.
+3. **A fase de GPIO tem de vir ANTES de qualquer `pwm_tpm_Ch_Init`** — ela precisa do pino no mux de
+   GPIO, e o PWM o leva para o mux 4. Depois das fases de PWM, voltar os dois ao GPIO antes de
+   repetir.
+4. ⭐ **Medir na ponta do JUMPER**, no conector que vai ao servo, não no pino da placa. O mesmo teste
+   passa a pegar fio partido e mau contato, que é o que o pino sozinho nunca mostra.
+5. **Acionar os dois pinos JUNTOS, com o LED espelhando o estado.** Um por vez deixava o outro em
+   0 V por 15 de cada 20 s — indistinguível de "pino morto" quando a serial estava muda, que era
+   exatamente a situação em que o teste foi escrito.
 
 ## ⭐ Medir PWM com multímetro — sem osciloscópio
 
