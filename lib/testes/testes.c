@@ -17,28 +17,48 @@
    tracking. Um reset ao meio-dia custava 12 minutos de sol. */
 #define NUMERO_DE_TESTES 5
 
+/* Teto de cada eixo na varredura. NAO sao iguais, e a razao e aritmetica:
+   o angulo comandado vira pulso por `CnV = 375 + FATOR * ang * 375/180`, e os
+   dois eixos tem fatores diferentes.
+
+     horizontal (fator 1,21): 180 graus -> CnV 829 -> 2,21 ms   dentro
+     vertical   (fator 1,47): 160 graus -> CnV 865 -> 2,31 ms   dentro
+                              180 graus -> CnV 926 -> 2,47 ms   ALEM DO FIM DE CURSO
+
+   ⛔ Por isso o vertical para em 160. A 180 ele empurra o batente interno e
+   trava por 1 s em cada passagem, DUAS vezes por ciclo, para sempre - e o MG90S
+   e de engrenagem metalica: nada escorrega para aliviar, ele so esquenta.
+   Ver D-41 e a tabela em context/03-hardware_specs/03-atuadores-mg90s.md.
+
+   ⚠️ Onde exatamente comeca o estalo e o que o P-08 quer medir - e isso merece
+   um teste dedicado e curto, nao uma varredura infinita passando por cima. */
+#define ANG_MAX_HORIZONTAL 180
+#define ANG_MAX_VERTICAL   160
+
 /* D-02: sem pwm_tpm_Init nem ldr_inicializar aqui. O main() ja fez. */
 
 int teste_motores(void){
 
-    printk("[teste] motores: varredura completa dos dois eixos\n");
+    printk("[teste] motores: varredura dos dois eixos "
+           "(horizontal ate %d, vertical ate %d)\n",
+           ANG_MAX_HORIZONTAL, ANG_MAX_VERTICAL);
 
     for(int i=0;; i++){
         //teste de motores horizontais
-        for(int angulo = 0; angulo <= 180; angulo += 10){
+        for(int angulo = 0; angulo <= ANG_MAX_HORIZONTAL; angulo += 10){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
-        for(int angulo = 180; angulo >= 0; angulo -= 10){
+        for(int angulo = ANG_MAX_HORIZONTAL; angulo >= 0; angulo -= 10){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
         //teste de motores verticais
-        for(int angulo = 0; angulo <= 180; angulo += 10){
+        for(int angulo = 0; angulo <= ANG_MAX_VERTICAL; angulo += 10){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
-        for(int angulo = 180; angulo >= 0; angulo -= 10){
+        for(int angulo = ANG_MAX_VERTICAL; angulo >= 0; angulo -= 10){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }

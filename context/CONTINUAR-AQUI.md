@@ -1,9 +1,58 @@
-# CONTINUAR AQUI — estado da investigação, 2026-09-14, 18h40
+# CONTINUAR AQUI — estado da investigação, 2026-09-14
 
-Documento de passagem entre sessões. **Não é spec nem decisão** — é o retrato de uma investigação
-em aberto, com o que foi medido, o que foi descartado e qual é o próximo experimento. Quando o caso
-fechar, o que sobrar de durável migra para `10-debts_and_pending/` ou `20-decisoes.md` e este
-arquivo é apagado.
+Documento de passagem entre sessões. **Não é spec nem decisão** — é o retrato de uma investigação,
+com o que foi medido, o que foi descartado e qual é o próximo experimento. Quando o caso fechar, o
+que sobrar de durável migra para `10-debts_and_pending/` ou `20-decisoes.md` e este arquivo é
+apagado.
+
+---
+
+## ✅ RESOLVIDO no fim do dia: a placa nunca recebeu as gravações
+
+⭐ **Confirmado por comparação controlada:** o mesmo binário, na mesma placa, gravado de **outro
+computador**, rodou os testes imediatamente. Nesta máquina, **nenhum upload chegou ao alvo** — apesar
+de o terminal sempre dizer `Firmware has been successfully uploaded` e de o `E:` nunca ter escrito
+`FAIL.TXT`.
+
+Isso encerra de uma vez tudo o que estava em aberto abaixo:
+
+| O que parecia problema | O que era |
+|---|---|
+| Servos não se movem | a placa rodava uma **imagem antiga** — a de antes das edições do dia |
+| LED não pisca | idem: o firmware do LED nunca foi gravado |
+| Serial muda | idem |
+| 0,16 V estáveis nos pinos | a assinatura da imagem antiga: `CnV = 375`, os servos parkados em 0° |
+
+⭐ **A leitura dos 0,16 V estava certa e foi o que apontou o caminho.** Vale guardar o raciocínio: 5%
+de duty sobre 3,3 V = pulso de 1 ms a 50 Hz = 0° de servo. A técnica está em
+[../02-software_specs/06-bringup-e-testes.md](02-software_specs/06-bringup-e-testes.md), seção
+"Medir PWM com multímetro".
+
+### O que sobra, e é bem mais estreito
+
+**Por que a gravação falha silenciosamente nesta máquina** (a de Windows 11, com PlatformIO em
+`D:\DevTools\.platformio`). O caminho que falha é `firmware.bin` → disco `E:` do DAPLink: o arquivo
+é consumido, o DAPLink não reclama, e o alvo não é reprogramado.
+
+⚠️ **Não é o VSCode.** Quem copia o arquivo é o `pio.exe`; o editor só hospeda o terminal.
+⚠️ **E reinstalar o toolchain não ataca isso** — o toolchain compila, não grava.
+
+**Na ordem, do mais barato ao mais caro:**
+
+1. **Copiar o `.bin` à mão** para o `E:` pelo Explorador e resetar. Funcionou? o culpado é o
+   uploader do PlatformIO. Falhou igual? é Windows/DAPLink, e reinstalar o PlatformIO não ajudaria;
+2. **Trocar o protocolo** para um caminho que não usa sistema de arquivos:
+   ```ini
+   upload_protocol = cmsis-dap    ; via pyocd, pela interface de depuracao
+   ```
+   Imune a antivírus, cache de escrita e Controlled Folder Access — os suspeitos clássicos de
+   "copiei e o DAPLink não programou";
+3. **Antivírus / Acesso Controlado a Pastas** do Windows bloqueando escrita em unidade removível;
+4. **Atualizar o firmware do DAPLink** (segurar RESET ao plugar monta o `BOOTLOADER`);
+5. Só então, reinstalar.
+
+⭐ **E enquanto isso: a outra máquina grava.** Dá para editar aqui e gravar lá sem bloquear a
+bancada.
 
 ---
 
@@ -17,6 +66,45 @@ pino de cada vez em vez dos dois juntos.
 Commite antes de trocar de máquina, ou recompile sabendo dessa diferença.
 
 ---
+
+---
+
+## ✅ A PLACA ESTÁ EXONERADA — e a suspeita mudou de lugar
+
+**Medido na máquina que grava:** com o teste de portas rodando, **PTD3 e PTD0 alternam em sincronia
+com o LED** — tensão alta enquanto o LED acende, 0 V enquanto apaga. Isso encerra, de uma vez:
+firmware roda, GPIO funciona, mux está certo, jumper conduz. Nenhuma das suspeitas de placa, clock,
+boot ou pino sobrevive.
+
+❌ **Nível lógico marginal — DESCARTADO.** Chegou-se a medir **2,8 V** de nível alto, o que
+levantaria a suspeita de o sinal de 3,3 V ficar perto demais do limiar de um servo alimentado a
+5 V. **Não se sustentou: a placa foi trocada e a nova entrega 3,3 V cheios.** Era característica
+daquela unidade, não do projeto.
+
+**Hipóteses para o servo não obedecer, agora que a placa está descartada:**
+
+1. **Terra comum ausente ou mal feito.** Foi instruído, nunca confirmado com continuidade. Sem
+   retorno comum o servo ignora o pulso, e o sintoma é exatamente "sinal correto, servo parado" —
+   ⭐ é a primeira a conferir, e conferir é encostar as pontas do multímetro em continuidade entre o
+   GND da placa e o GND do servo;
+2. **O próprio servo.** Testar um dos dois num servo tester ou numa fonte de pulso conhecida;
+3. **Alimentação do servo** — tensão nos terminais **dele**, não na saída do carregador.
+
+⚠️⚠️ **EXISTEM DUAS PLACAS NESTA INVESTIGAÇÃO.** A troca aconteceu em 2026-09-14, no fim do dia.
+Boa parte do que está registrado abaixo — os 0,16 V estáveis, o LED que não piscava, a serial muda —
+foi medido na **placa antiga**. Ao retomar, **diga sempre de qual placa é cada medição**, senão
+observações de duas peças diferentes viram uma contradição que não existe.
+
+⭐ **E o recibo de cor funcionou:** o LED daquela placa está **VERMELHO**, o que significa que ela
+tem o build **anterior** ao da mudança para verde. O mecanismo faz o que prometia — diz qual imagem
+está gravada.
+
+---
+
+# ⬇️ Daqui para baixo: o registro de COMO se chegou lá
+
+Mantido porque a trilha de descarte vale mais que a conclusão — é ela que impede regastar hipótese.
+⚠️ **Tudo abaixo descreve o estado ANTES da confirmação acima.**
 
 ## O sintoma
 
@@ -57,7 +145,7 @@ exata de **um firmware antigo que parkou os servos em 0° e não faz mais nada**
 
 ---
 
-## 🥇 Suspeita principal: a placa não está executando o que gravamos
+## 🥇 Suspeita principal — ✅ **CONFIRMADA**: a placa não está executando o que gravamos
 
 Uma única hipótese explica as quatro observações sem nenhuma suposição extra: **o KL25Z continua
 rodando uma imagem anterior**, e as gravações de hoje não chegaram a ele.
@@ -111,9 +199,13 @@ Depois de gravar, **apertar o SW1/RESET** e medir PTD3:
 
 ---
 
-## 🥈 Suspeita secundária: o rail de 3,3 V do alvo
+## 🥈 Suspeita secundária: o rail de 3,3 V do alvo — ❌ **caiu junto**
 
-**Nunca foi medido, e é a única medição pedida que ficou sem resposta.** Ponta preta no GND, ponta
+A placa rodou normalmente quando gravada do outro computador, então o rail de 3,3 V está bom. Fica
+registrado o raciocínio, porque a medição continua valendo como primeiro passo em qualquer sintoma
+de "o alvo não executa":
+
+**Nunca foi medido, e era a única medição pedida que ficou sem resposta.** Ponta preta no GND, ponta
 vermelha em **`P3V3`** do header:
 
 - **~3,3 V** → o alvo tem alimentação; a suspeita principal continua sendo a de cima;

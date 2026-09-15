@@ -19,4 +19,14 @@
    em que a ultima fase termina. */
 void teste_portas_servo(void);
 
+/* ⭐ RECIBO DE GRAVACAO, isolado para poder ser chamado por qualquer teste.
+   Pisca tres vezes rapido, na cor escolhida por LED_DO_TESTE no .c, e retorna
+   em ~1,5 s.
+
+   Troque a cor a cada build: se a placa nao mudar de cor, o upload NAO chegou
+   ao alvo. Em 2026-09-14 um dia inteiro foi gasto medindo sintomas de firmware
+   que nunca subiu, porque nao havia como distinguir "gravou" de "nao gravou".
+   Ver context/CONTINUAR-AQUI.md. */
+void teste_portas_recibo(void);
+
 #endif /* TESTE_PORTAS_H */

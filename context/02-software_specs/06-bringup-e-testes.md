@@ -153,6 +153,29 @@ opcional.
 
 ---
 
+## ⭐ A cor do LED como recibo de gravação
+
+⭐ **Troque a cor do LED a cada build, e confira a placa antes de medir qualquer coisa.** Se a cor
+não mudou, a gravação não chegou ao alvo — e você descobre isso em dois segundos, em vez de passar
+horas medindo sintomas de um firmware que nunca subiu.
+
+O mecanismo está em `lib/teste_portas/teste_portas.c`, numa constante única:
+
+```c
+#define LED_DO_TESTE  0   /* 0 = VERDE (led0)  1 = AZUL (led1)  2 = VERMELHO (led2) */
+```
+
+⛔ **Por que isso existe:** em 2026-09-14 **nenhuma** gravação de uma das máquinas chegou ao alvo,
+enquanto o terminal dizia `Firmware has been successfully uploaded` e o DAPLink não escrevia
+`FAIL.TXT`. O dia inteiro foi gasto investigando servo, alimentação e pino — tudo sintoma de uma
+imagem antiga que continuava rodando. A confirmação veio por comparação controlada: o mesmo
+binário, na mesma placa, gravado de outro computador, funcionou na hora.
+
+⚠️ **Nenhuma mensagem do gravador prova que o alvo foi reprogramado.** O `E:` montar, o arquivo ser
+consumido e o log dizer sucesso são trabalho do **OpenSDA**, um segundo microcontrolador na própria
+placa. Só algo que **mude visivelmente no alvo** prova gravação — e a cor do LED é a forma mais
+barata disso.
+
 ## ⭐ Medir PWM com multímetro — sem osciloscópio
 
 Não há osciloscópio na bancada, e não é preciso: **multímetro em DC mede a média**, e média de um

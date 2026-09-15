@@ -39,7 +39,7 @@ int main(void){
        abortar o boot (o ldr_inicializar(), quando voltar) mataria junto o teste
        que existe para investigar isso. Roda um numero fixo de escadas e cede a
        vez ao teste_motores() abaixo. */
-    teste_portas_servo();
+    //teste_portas_servo();
 
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
@@ -83,6 +83,11 @@ int main(void){
        12 min 40 s de sono bloqueante em TODO boot, antes da primeira leitura de
        tracking. Agora sao opt-in de compilacao - ver platformio.ini. */
 //#ifdef RODAR_TESTES_NO_BOOT
+    /* RECIBO DE GRAVACAO: pisca 3x na cor de LED_DO_TESTE antes de qualquer
+       coisa girar. Troque a cor a cada build - se a placa nao mudar de cor,
+       o upload nao chegou, e nada do que se medir depois significa nada. */
+    teste_portas_recibo();
+
     teste_motores();
     //teste_ldr();
     //printk("Testes terminados, começando o tracker...\n");
