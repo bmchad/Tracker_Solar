@@ -169,9 +169,13 @@ void teste_rot_cont_medir_omega(int n)
 #define POSICAO_MAX_PASSOS   60
 
 /* Uma varredura num sentido, ate a camada recusar. Devolve quantos comandos
-   foram aceitos - numero util para conferir contra a conta: com omega de
-   60 graus/s e passos de 500 ms, cada comando vale 30 graus, entao o limite de
-   120 graus cai em ~4 comandos. */
+   foram aceitos - numero util para conferir contra a conta:
+
+       graus por comando = POSICAO_PASSO_MS * omega / 1000
+       comandos ate o limite = LIMITE do eixo / graus por comando
+
+   ⚠️ Os numeros nao ficam anotados aqui: omega e os limites de curso estao em
+   ajuste, e comentario que cita valor derivado envelhece a cada build. */
 static int varrer(const char *eixo, const char *sentido, servo_dir_t dir,
                   uint32_t (*mover)(servo_dir_t, uint32_t),
                   int32_t (*theta_d10)(void))

@@ -86,9 +86,25 @@
 #define OMEGA_V_HORARIO_D10_S    OMEGA_D10_S(VELOCIDADE_PCT_V)
 #define OMEGA_V_ANTI_D10_S       OMEGA_D10_S(VELOCIDADE_PCT_V)
 
-/* Limites de curso, em decimos de grau, a partir da origem zerada A MAO. */
-#define LIMITE_H_D10            1200   /* +-120 graus */
-#define LIMITE_V_D10             500   /* +-50 graus  */
+/* A odometria trabalha em decimos de grau. GRAUS() deixa a unidade escrita no
+   proprio valor, em vez de num comentario ao lado que envelhece toda vez que o
+   numero muda. */
+#define GRAUS(g)   ((g) * 10)
+
+/* ⚠️ Limites de curso a partir da origem zerada A MAO, e sao SIMETRICOS: o eixo
+   anda +-este valor.
+
+   Os valores antigos (+-120 no horizontal, +-50 no vertical) vieram de
+   suposicao, e a bancada os contradisse em 2026-09-15 - o tracker tem
+   mobilidade muito maior, e o eixo estava parando num LIMITE FALSO bem antes do
+   fim de curso real.
+
+   ⛔ O limite falso continua existindo, so que mais longe: ele nasce da
+   odometria acumular erro (theta conta omega*t, e o eixo anda menos que isso
+   porque a partida do motor consome parte do comando). Subir o limite devolve
+   curso util; nao elimina a drift. */
+#define LIMITE_H_D10   GRAUS(360)
+#define LIMITE_V_D10   GRAUS(360)
 
 /* ⚠️ Comando curto demais e consumido pela PARTIDA do motor: o eixo mal sai do
    lugar, mas a odometria conta omega * t inteiro. O erro e sempre no mesmo

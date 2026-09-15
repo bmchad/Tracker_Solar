@@ -49,7 +49,7 @@ deixou de ser chamado. Ver o comentario no fim deste arquivo.
    com omega saindo de VELOCIDADE_PCT em sevo_motor.c. ⚠️ O valor em graus NAO
    fica anotado aqui de proposito: este parametro esta em ajuste ativo, e
    comentario que cita valor derivado vira mentira no proximo build. */
-#define PASSO_MS        50
+#define PASSO_MS        25
 
 /* ⛔ Passo abaixo do minimo da camada faria o tracker NUNCA mover, e em
    silencio: mover() recusaria todo comando e devolveria 0 para sempre. Pega em
@@ -57,7 +57,7 @@ deixou de ser chamado. Ver o comentario no fim deste arquivo.
 BUILD_ASSERT(PASSO_MS >= SERVO_MS_MIN,
              "PASSO_MS abaixo de SERVO_MS_MIN: todo comando seria recusado");
 
-#define PERIODO_MS     1000   /* entre amostras, com o eixo parado            */
+#define PERIODO_MS     300   /* entre amostras, com o eixo parado            */
 #define ASSENTAMENTO_MS 300   /* depois de mover, antes de reler (DEC-11)     */
 #define NOITE_MS       5000
 
@@ -213,10 +213,15 @@ int main(void){
        desde o primeiro ciclo, no meio do curso fisico real.
 
        ⚠️ A origem precisa ser o CENTRO do curso util, nao um ponto qualquer: a
-       janela de limite e simetrica, entao zerar fora do meio faz um dos lados
-       nao caber. O bloco de NOTAS no topo manda posicionar o tracker a mao antes
-       de ligar - se algum teste acima girou os eixos, reposicione A MAO antes de
-       confiar no laco. */
+       janela de LIMITE_*_D10 e simetrica (+-o valor), entao zerar fora do meio
+       faz um dos lados nao caber. O bloco de NOTAS no topo manda posicionar o
+       tracker a mao antes de ligar - se algum teste acima girou os eixos,
+       reposicione A MAO antes de confiar no laco.
+
+       ⛔ E mesmo com a origem perfeita o eixo para num LIMITE FALSO: theta conta
+       omega*t e o eixo anda menos que isso, entao a odometria infla e o limite
+       chega antes do fim de curso real. Subir LIMITE_*_D10 (hoje +-360 graus)
+       devolve curso util, nao elimina a drift. */
     servo_zerar_horizontal();
     servo_zerar_vertical();
 

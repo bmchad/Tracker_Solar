@@ -55,14 +55,20 @@ void teste_rot_cont_medir_omega(int n);
 /* Varre o eixo pela CAMADA DE SERVO: 0 -> limite superior -> 0 -> limite
    inferior -> 0, com 1 s parado entre varreduras. Retorna ao fim.
 
-   ⏱ NAO e infinito e nao demora: ~8 s o vertical, ~14 s o horizontal. Quem para
-   a varredura e o LIMITE DE CURSO da camada, nao um contador - com +-50 graus e
-   omega de 60 graus/s, cada comando de 500 ms anda 30 graus, entao sao 3 ou 4
-   comandos por varredura. Por isso nao recebem `n`: o fim e o limite.
+   ⏱ NAO sao infinitos, mas o tempo deles ACOMPANHA O LIMITE DE CURSO: quem para
+   a varredura e o limite da camada, nao um contador, entao subir LIMITE_*_D10
+   alonga o teste na mesma proporcao. Por isso nao recebem `n` - o fim e o
+   limite. A conta e (LIMITE / graus por comando) x 4 varreduras, com cada
+   comando valendo POSICAO_PASSO_MS * omega / 1000.
 
-   ⚠️ Terminam com theta NO EXTREMO (+500 no vertical, +1200 no horizontal), e
-   zeram theta por dentro ao comecar. Rodar o tracker depois sem servo_zerar_*()
-   faz ele recusar metade das correcoes desde o primeiro ciclo.
+   ⛔ COM OS LIMITES EM +-360 GRAUS, cada eixo varre DUAS VOLTAS COMPLETAS, duas
+   vezes. Se houver cabo preso ao painel, ele enrola - o limite de curso era a
+   unica coisa impedindo, e POSICAO_MAX_PASSOS e teto de seguranca folgado
+   demais para servir de segunda barreira.
+
+   ⚠️ Terminam com theta NO EXTREMO, e zeram theta por dentro ao comecar. Rodar o
+   tracker depois sem servo_zerar_*() faz ele recusar metade das correcoes desde
+   o primeiro ciclo.
 
    ⭐ E o unico teste que exercita a ODOMETRIA e o LIMITE DE CURSO. A cada
    comando imprime o theta estimado e o tempo efetivamente aplicado - quando a
