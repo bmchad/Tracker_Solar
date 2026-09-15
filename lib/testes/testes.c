@@ -17,23 +17,28 @@
    tracking. Um reset ao meio-dia custava 12 minutos de sol. */
 #define NUMERO_DE_TESTES 5
 
-/* Teto de cada eixo na varredura. NAO sao iguais, e a razao e aritmetica:
-   o angulo comandado vira pulso por `CnV = 375 + FATOR * ang * 375/180`, e os
-   dois eixos tem fatores diferentes.
+/* Teto de cada eixo na varredura.
 
-     horizontal (fator 1,21): 180 graus -> CnV 829 -> 2,21 ms   dentro
-     vertical   (fator 1,47): 160 graus -> CnV 865 -> 2,31 ms   dentro
-                              180 graus -> CnV 926 -> 2,47 ms   ALEM DO FIM DE CURSO
+   ⚠️ Este comentario descrevia os fatores empiricos 1,21 e 1,47, e eles SAIRAM
+   do codigo em 2026-09-14: `sevo_angulo_tenpo.c` agora faz simplesmente
+   `CnV = 375 + ang * 375/180`. Com os MG90S o mapeamento nominal basta.
 
-   ⛔ Por isso o vertical para em 160. A 180 ele empurra o batente interno e
-   trava por 1 s em cada passagem, DUAS vezes por ciclo, para sempre - e o MG90S
-   e de engrenagem metalica: nada escorrega para aliviar, ele so esquenta.
-   Ver D-41 e a tabela em context/03-hardware_specs/03-atuadores-mg90s.md.
+   Com fator 1, nenhum dos dois eixos corre risco de fim de curso:
 
-   ⚠️ Onde exatamente comeca o estalo e o que o P-08 quer medir - e isso merece
-   um teste dedicado e curto, nao uma varredura infinita passando por cima. */
+     0 grau   -> CnV 375 -> 1,00 ms
+     160 graus-> CnV 708 -> 1,89 ms
+     180 graus-> CnV 750 -> 2,00 ms   (o teto nominal do servo)
+
+   ⭐ Ou seja: 180 voltou a ser SEGURO nos dois eixos. Os 160 abaixo sao uma
+   escolha de bancada - margem para nao encostar no extremo -, nao mais uma
+   protecao contra o servo empurrar o batente. */
 #define ANG_MAX_HORIZONTAL 160
 #define ANG_MAX_VERTICAL   160
+
+/* Pausa entre uma varredura e a seguinte. Cada PASSO ja bloqueia 1 s dentro de
+   servo_*_angulo_tempo(); isto e uma pausa a mais no FIM de cada varredura, para
+   separar visualmente ida de volta e um eixo do outro. */
+#define PAUSA_ENTRE_VARREDURAS_MS 1000
 
 /* D-02: sem pwm_tpm_Init nem ldr_inicializar aqui. O main() ja fez. */
 
@@ -49,19 +54,26 @@ int teste_motores(void){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
+        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
+
         for(int angulo = ANG_MAX_HORIZONTAL; angulo >= 0; angulo -= 5){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
+        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
+
         //teste de motores verticais
         for(int angulo = 0; angulo <= ANG_MAX_VERTICAL; angulo += 5){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
+        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
+
         for(int angulo = ANG_MAX_VERTICAL; angulo >= 0; angulo -= 5){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
+        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
     }
    return 0;
 

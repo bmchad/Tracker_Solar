@@ -20,6 +20,7 @@ em init_hora.c coloque hora, minuto segundo
 #include <servo_angulo_tempo.h>
 #include <testes.h>
 #include <teste_portas.h>
+#include <teste_rot_cont.h>
 
 // Para um clock de 48 MHz e prescaler de 128 (PS_128), a frequência do timer é 375 kHz.
 // Para um período de 20ms (50Hz), TPM_MODULE (MOD) deve ser 7500.
@@ -86,9 +87,11 @@ int main(void){
     /* RECIBO DE GRAVACAO: pisca 3x na cor de LED_DO_TESTE antes de qualquer
        coisa girar. Troque a cor a cada build - se a placa nao mudar de cor,
        o upload nao chegou, e nada do que se medir depois significa nada. */
-    teste_portas_recibo();
+    /* Servo de ROTACAO CONTINUA: pulso e velocidade, nao angulo.
+       O teste_motores() varre ANGULOS e nao faz sentido para ele. */
+    teste_rot_cont();
 
-    teste_motores();
+    //teste_motores();
     //teste_ldr();
     //printk("Testes terminados, começando o tracker...\n");
 //#else

@@ -57,7 +57,7 @@
    ⚠️ O AZUL fica em PTD1 = TPM0_CH1 - mesma porta e mesmo timer dos pinos de
    servo. Como GPIO nao ha conflito, mas quem habilitar o canal 1 do TPM0 um dia
    vai disputar esse pino. Verde e vermelho estao no port B, longe de tudo. */
-#define LED_DO_TESTE  1
+#define LED_DO_TESTE  0
 
 #if   LED_DO_TESTE == 0
 #  define LED_NODE DT_ALIAS(led0)
