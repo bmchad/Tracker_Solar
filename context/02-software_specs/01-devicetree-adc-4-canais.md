@@ -25,7 +25,7 @@ tracker passa a virar para o lado errado sem uma única mensagem de log.
 / {
     zephyr,user {
         /* ⚠️ A ORDEM AQUI define o índice do enum ldr_id_t em lib/ldr/ldr.h:
-           0 = LDR_ESQ   1 = LDR_DIR   2 = LDR_CIMA   3 = LDR_BAIXO
+           0 = LDR_SUP_ESQ  1 = LDR_SUP_DIR  2 = LDR_INF_ESQ  3 = LDR_INF_DIR
            Mexeu na ordem aqui, mexa no enum lá. Não há erro de compilação
            que pegue isso — o sintoma é o painel virando ao contrário. */
         io-channels = <&adc0 8>,   /* PTB0 = A0 — SE8  — esquerda */

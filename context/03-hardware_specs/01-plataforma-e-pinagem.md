@@ -23,10 +23,10 @@ referenciam daqui. Se um fio mudar, mude aqui.
 |---|---|---|---|---|
 | PWM horizontal (azimute) | **PTD3** | `TPM0` canal 3 | `MUX(4)` | `src/main.c:37`, `lib/servo_motor/` |
 | PWM vertical (inclinação) | **PTD0** | `TPM0` canal 0 | `MUX(4)` | `src/main.c:38`, `lib/servo_motor/` |
-| LDR esquerda | **PTB0** = `A0` | `ADC0_SE8` | analógico | overlay, nó `channel@8` |
-| LDR direita | **PTB2** = `A2` | `ADC0_SE12` | analógico | overlay, nó `channel@c` |
-| LDR cima | **PTB1** = `A1` | `ADC0_SE9` | analógico | overlay, nó `channel@9` |
-| LDR baixo | **PTB3** = `A3` | `ADC0_SE13` | analógico | overlay, nó `channel@d` |
+| LDR **superior esquerdo** | **PTB0** = `A0` | `ADC0_SE8` | analógico | overlay, nó `channel@8` |
+| LDR **superior direito** | **PTB2** = `A2` | `ADC0_SE12` | analógico | overlay, nó `channel@c` |
+| LDR **inferior esquerdo** | **PTB1** = `A1` | `ADC0_SE9` | analógico | overlay, nó `channel@9` |
+| LDR **inferior direito** | **PTB3** = `A3` | `ADC0_SE13` | analógico | overlay, nó `channel@d` |
 
 ⭐ **Os quatro LDRs ficam em `A0`, `A1`, `A2`, `A3` — quatro pinos contíguos no mesmo header
 Arduino.** Isso não é coincidência feliz, é o critério que fechou a escolha (**DEC-12**): fio
@@ -65,7 +65,8 @@ Ou seja: **`CnV = 375` é o mínimo de curso e `CnV = 750` o máximo**, e 1 grau
 [03-atuadores-mg90s.md](03-atuadores-mg90s.md).
 
 `TPM_MODULE 7500` está **redefinido em quatro arquivos** (`src/main.c`, `lib/testes/testes.c`,
-`lib/servo_motor/servo_angulo_tempo.h` e por herança quem o inclui). Ver **D-34**.
+`lib/servo_motor/servo_motor.h` e por herança quem o inclui). ⭐ **Metade resolvida em 2026-09-15**:
+o header de servo parou de arrastar o Zephyr inteiro e de redefinir esses quatro macros. Ver **D-34**.
 
 ## Pinos declarados e não usados
 

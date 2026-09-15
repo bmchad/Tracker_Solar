@@ -30,13 +30,29 @@ erro_vertical   = ldr[CIMA]     - ldr[BAIXO]
 
 Uma subtração por eixo, um sensor por direção. Simples de propósito.
 
-⚠️ **Se a aleta virar um `+`**, os quadrantes passam a ser diagonais (sup-esq, sup-dir, inf-esq,
-inf-dir) e a mistura muda para **soma de pares**:
+## ⭐ O arranjo REAL é a cruz (`+`) — desde 2026-09-15
+
+A montagem ficou em **cruz**, não em X. O que está descrito acima é o arranjo que a **DEC-1** havia
+escolhido e que a bancada não seguiu; fica como registro do raciocínio, porque é ele que explica por
+que a troca custou uma função.
+
+Com a cruz, os quadrantes são **diagonais** (sup-esq, sup-dir, inf-esq, inf-dir) e a mistura é
+**soma de pares**:
 
 ```
 erro_horizontal = (SUP_ESQ + INF_ESQ) - (SUP_DIR + INF_DIR)
 erro_vertical   = (SUP_ESQ + SUP_DIR) - (INF_ESQ + INF_DIR)
 ```
+
+⛔ **E os nomes dos sensores tiveram de mudar junto.** Com o X havia "o sensor da esquerda"; com a
+cruz há **dois** sensores à esquerda, um em cima e um embaixo. O `enum ldr_id_t` era
+`LDR_ESQ/DIR/CIMA/BAIXO` e passou a ser `LDR_SUP_ESQ/SUP_DIR/INF_ESQ/INF_DIR` — o nome antigo
+**mentia sobre o hardware**: `LDR_CIMA` era, fisicamente, o inferior esquerdo. A ordem de
+`io-channels` no overlay **não** mudou; só os nomes e os comentários.
+
+⚠️ **O erro tem o DOBRO da magnitude do arranjo em X**, porque cada lado é a soma de dois
+sensores. `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU` precisam ser reescalados na mesma proporção —
+senão a zona morta efetiva vira metade e o tracker fica nervoso perto do alvo.
 
 É por isso que a spec de controle isola a mistura numa função única — ver
 [../02-software_specs/03-controle-4-quadrantes.md](../02-software_specs/03-controle-4-quadrantes.md).

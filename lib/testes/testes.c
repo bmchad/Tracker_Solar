@@ -5,7 +5,7 @@
 #include <ldr.h>
 #include <init_hora.h>              // Biblioteca do relógio de software
 #include <angulo_incidencia_solar.h>
-#include <servo_angulo_tempo.h>     // D-07: faltava. As chamadas de servo abaixo
+#include <servo_motor.h>     // D-07: faltava. As chamadas de servo abaixo
                                     // eram declaracao implicita - o compilador
                                     // assumia `int f()` e parava de conferir os
                                     // argumentos. Removida do C23.
@@ -17,64 +17,74 @@
    tracking. Um reset ao meio-dia custava 12 minutos de sol. */
 #define NUMERO_DE_TESTES 5
 
-/* Teto de cada eixo na varredura.
+/* ⭐ ESTE TESTE MUDOU DE NATUREZA em 2026-09-15, junto com a camada de servo.
 
-   ⚠️ Este comentario descrevia os fatores empiricos 1,21 e 1,47, e eles SAIRAM
-   do codigo em 2026-09-14: `sevo_angulo_tenpo.c` agora faz simplesmente
-   `CnV = 375 + ang * 375/180`. Com os MG90S o mapeamento nominal basta.
+   Antes ele varria ANGULOS (0, 10, 20... 180), o que deixou de fazer sentido:
+   os servos sao de ROTACAO CONTINUA e nao tem posicao. O pulso comanda
+   velocidade, e a camada de servo agora fala direcao + tempo.
 
-   Com fator 1, nenhum dos dois eixos corre risco de fim de curso:
+   O que ele exercita agora:
+     - que cada sentido move o eixo para o lado esperado;
+     - que a ODOMETRIA acumula (theta cresce e decresce como deveria);
+     - ⭐ que o LIMITE DE CURSO satura: ao chegar em +-120 (horizontal) ou
+       +-50 (vertical), a funcao devolve MENOS tempo que o pedido, e no limite
+       devolve 0. E o unico teste que exercita essa protecao.
 
-     0 grau   -> CnV 375 -> 1,00 ms
-     160 graus-> CnV 708 -> 1,89 ms
-     180 graus-> CnV 750 -> 2,00 ms   (o teto nominal do servo)
+   ⛔ NAO serve para medir omega. Medir omega tem de ser feito com CnV cru, por
+   fora desta camada - ela satura a duracao usando o proprio omega, entao medir
+   por aqui seria medir a suposicao. Ver teste_rot_cont_medir_omega(). */
+#define PASSO_MS            500   /* duracao de cada comando                  */
+#define COMANDOS_POR_LADO    12   /* 12 x 500 ms: o bastante para bater no limite */
+#define PAUSA_ENTRE_ETAPAS 1000
 
-   ⭐ Ou seja: 180 voltou a ser SEGURO nos dois eixos. Os 160 abaixo sao uma
-   escolha de bancada - margem para nao encostar no extremo -, nao mais uma
-   protecao contra o servo empurrar o batente. */
-#define ANG_MAX_HORIZONTAL 160
-#define ANG_MAX_VERTICAL   160
+static void empurrar(const char *nome, servo_dir_t dir,
+                     uint32_t (*mover)(servo_dir_t, uint32_t),
+                     int32_t (*theta)(void))
+{
+    printk("\n[motores] %s: %d comandos de %d ms no mesmo sentido\n",
+           nome, COMANDOS_POR_LADO, PASSO_MS);
 
-/* Pausa entre uma varredura e a seguinte. Cada PASSO ja bloqueia 1 s dentro de
-   servo_*_angulo_tempo(); isto e uma pausa a mais no FIM de cada varredura, para
-   separar visualmente ida de volta e um eixo do outro. */
-#define PAUSA_ENTRE_VARREDURAS_MS 1000
+    for (int i = 0; i < COMANDOS_POR_LADO; i++) {
+        uint32_t aplicado = mover(dir, PASSO_MS);
 
-/* D-02: sem pwm_tpm_Init nem ldr_inicializar aqui. O main() ja fez. */
+        printk("  pedido=%4d ms  aplicado=%4u ms  theta=%+5d decimos de grau%s\n",
+               PASSO_MS, aplicado, theta(),
+               (aplicado == 0)          ? "   <- LIMITE: nao ha mais curso"
+             : (aplicado < PASSO_MS)    ? "   <- saturou no limite"
+                                        : "");
+
+        if (aplicado == 0) {
+            break;   /* bateu no limite; insistir so gasta tempo */
+        }
+    }
+
+    k_msleep(PAUSA_ENTRE_ETAPAS);
+}
 
 int teste_motores(void){
 
-    printk("[teste] motores: varredura dos dois eixos "
-           "(horizontal ate %d, vertical ate %d)\n",
-           ANG_MAX_HORIZONTAL, ANG_MAX_VERTICAL);
+    printk("[teste] motores: direcao + tempo, com odometria e limite de curso\n");
+    printk("⚠️ Os limites so protegem se OMEGA estiver medido - ver o .c da\n");
+    printk("camada de servo. Com omega placeholder, eles apenas parecem proteger.\n");
+
+    /* Origem: os dois eixos sao posicionados A MAO antes de ligar, no CENTRO do
+       curso util (vertical: placa paralela ao solo). Zerar aqui e o que faz
+       +-120 e +-50 significarem algo fisico. */
+    servo_zerar_horizontal();
+    servo_zerar_vertical();
 
     for(int i=0;; i++){
-        //teste de motores horizontais
-        for(int angulo = 0; angulo <= ANG_MAX_HORIZONTAL; angulo += 5){
-            servo_horizontal_angulo_tempo(angulo, 1);
-            printk("Angulo horizontal: %d\n", angulo);
-        }
-        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
+        empurrar("horizontal, sentido horario", SERVO_HORARIO,
+                 servo_horizontal_direcao_tempo, servo_theta_horizontal_d10);
+        empurrar("horizontal, anti-horario",    SERVO_ANTIHORARIO,
+                 servo_horizontal_direcao_tempo, servo_theta_horizontal_d10);
 
-        for(int angulo = ANG_MAX_HORIZONTAL; angulo >= 0; angulo -= 5){
-            servo_horizontal_angulo_tempo(angulo, 1);
-            printk("Angulo horizontal: %d\n", angulo);
-        }
-        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
-
-        //teste de motores verticais
-        for(int angulo = 0; angulo <= ANG_MAX_VERTICAL; angulo += 5){
-            servo_vertical_angulo_tempo(angulo, 1);
-            printk("Angulo vertical: %d\n", angulo);
-        }
-        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
-
-        for(int angulo = ANG_MAX_VERTICAL; angulo >= 0; angulo -= 5){
-            servo_vertical_angulo_tempo(angulo, 1);
-            printk("Angulo vertical: %d\n", angulo);
-        }
-        k_msleep(PAUSA_ENTRE_VARREDURAS_MS);
+        empurrar("vertical, sentido horario",   SERVO_HORARIO,
+                 servo_vertical_direcao_tempo,   servo_theta_vertical_d10);
+        empurrar("vertical, anti-horario",      SERVO_ANTIHORARIO,
+                 servo_vertical_direcao_tempo,   servo_theta_vertical_d10);
     }
+
    return 0;
 
 }
@@ -97,14 +107,28 @@ int teste_ldr(void){
         if(err < 0){
             printk("LDR: varredura falhou (%d)\n", err);
         } else {
-            /* ⚠️ O SINAL destas duas contas e a mistura do controle, e ela e
+            /* ⭐ ARRANJO EM CRUZ: SOMA DE PARES, nao subtracao de sensores
+               individuais. Com a cruz os quadrantes sao diagonais, entao cada
+               eixo usa os QUATRO sensores.
+
+               ⚠️ O SINAL destas duas contas e a mistura do controle, e ela e
                dona de context/02-software_specs/03-controle-4-quadrantes.md.
                Aqui e so o mesmo sentido, para o teste do dedo no bringup bater
-               com o que o controle vai enxergar. */
-            printk("LDR esq=%d dir=%d cima=%d baixo=%d mV | erro_h=%+d erro_v=%+d mV\n",
-                   mv[LDR_ESQ], mv[LDR_DIR], mv[LDR_CIMA], mv[LDR_BAIXO],
-                   (int)(mv[LDR_ESQ]  - mv[LDR_DIR]),
-                   (int)(mv[LDR_CIMA] - mv[LDR_BAIXO]));
+               com o que o controle vai enxergar.
+
+               ⚠️ O erro tem o DOBRO da magnitude do arranjo em X - sao dois
+               sensores somados de cada lado. ZONA_MORTA_MV e GANHO_MV_POR_GRAU
+               precisam ser reescalados na mesma proporcao. */
+            int32_t esq   = mv[LDR_SUP_ESQ] + mv[LDR_INF_ESQ];
+            int32_t dir   = mv[LDR_SUP_DIR] + mv[LDR_INF_DIR];
+            int32_t cima  = mv[LDR_SUP_ESQ] + mv[LDR_SUP_DIR];
+            int32_t baixo = mv[LDR_INF_ESQ] + mv[LDR_INF_DIR];
+
+            printk("LDR se=%d sd=%d ie=%d id=%d mV | erro_h=%+d erro_v=%+d mV\n",
+                   mv[LDR_SUP_ESQ], mv[LDR_SUP_DIR],
+                   mv[LDR_INF_ESQ], mv[LDR_INF_DIR],
+                   (int)(esq  - dir),
+                   (int)(cima - baixo));
         }
         k_msleep(500);
     }

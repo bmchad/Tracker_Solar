@@ -7,7 +7,18 @@ Uma entrada por decisão. Data, escolha, alternativa recusada, motivo.
 
 ---
 
-## DEC-1 — Divisor em X, não em `+`
+## DEC-1 — Divisor em X, não em `+` — ⚠️ REVERTIDA PELO HARDWARE (2026-09-15)
+
+> ⛔ **A montagem ficou em CRUZ (`+`), não em X.** Esta decisão não foi revogada por argumento —
+> perdeu para o hardware que foi construído. O raciocínio abaixo continua correto e vale a leitura:
+> ele é o que explica por que a mistura precisou mudar, e por que mudar custou uma função em vez de
+> uma auditoria. A mistura vigente é **soma de pares**, e mora em
+> [03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md](03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md).
+>
+> ⭐ **E a cruz trouxe um ganho que esta decisão não previu:** com soma de pares, **cada eixo usa os
+> quatro sensores**. O sinal soma (cresce com 2) e o ruído de dois sensores independentes cresce com
+> √2 — a relação sinal-ruído **melhora**. Em troca, um LDR descasado contamina os dois eixos com
+> metade do peso, em vez de concentrar o erro num só.
 
 **2026-09-02.** O arranjo dos 4 LDRs é 2×2 com aleta em **X**, o que faz cada quadrante apontar
 para uma direção (esquerda, direita, cima, baixo).

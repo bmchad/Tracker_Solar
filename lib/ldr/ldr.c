@@ -12,14 +12,14 @@
 
 /* ⚠️ CONTRATO, e e o acoplamento mais facil de quebrar neste projeto: a ordem
    deste vetor e a ordem de io-channels no overlay E a ordem do enum ldr_id_t.
-   Os indices designados ([LDR_ESQ] = ...) existem para que a correspondencia
+   Os indices designados ([LDR_SUP_ESQ] = ...) existem para que a correspondencia
    fique escrita, e nao implicita na posicao.
    Ver context/02-software_specs/01-devicetree-adc-4-canais.md. */
 static const struct adc_dt_spec canais[LDR_COUNT] = {
-    [LDR_ESQ]   = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 0),   /* PTB0 = A0 = SE8  */
-    [LDR_DIR]   = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 1),   /* PTB2 = A2 = SE12 */
-    [LDR_CIMA]  = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 2),   /* PTB1 = A1 = SE9  */
-    [LDR_BAIXO] = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 3),   /* PTB3 = A3 = SE13 */
+    [LDR_SUP_ESQ] = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 0),   /* PTB0 = A0 = SE8  */
+    [LDR_SUP_DIR] = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 1),   /* PTB2 = A2 = SE12 */
+    [LDR_INF_ESQ] = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 2),   /* PTB1 = A1 = SE9  */
+    [LDR_INF_DIR] = ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 3),   /* PTB3 = A3 = SE13 */
 };
 
 /* ⭐ Pega a divergencia de QUANTIDADE em tempo de compilacao: overlay com tres
@@ -29,10 +29,10 @@ BUILD_ASSERT(DT_PROP_LEN(ADC_NODE, io_channels) == LDR_COUNT,
              "io-channels do overlay e LDR_COUNT divergiram");
 
 static const char *const nomes[LDR_COUNT] = {
-    [LDR_ESQ]   = "esq",
-    [LDR_DIR]   = "dir",
-    [LDR_CIMA]  = "cima",
-    [LDR_BAIXO] = "baixo",
+    [LDR_SUP_ESQ] = "sup-esq",
+    [LDR_SUP_DIR] = "sup-dir",
+    [LDR_INF_ESQ] = "inf-esq",
+    [LDR_INF_DIR] = "inf-dir",
 };
 
 /* D-37: buffer static compartilhado por todos os canais, sem lock. Fecha hoje
@@ -106,7 +106,7 @@ int ldr_ler(ldr_id_t id, int32_t *mv_out)
     /* Comparacao sem sinal: pega id negativo tambem, porque o enum pode ser
        unsigned e `id < 0` viraria sempre falso, com aviso do compilador. */
     if ((unsigned int)id >= LDR_COUNT) {
-        printk("LDR invalido (%d). Use LDR_ESQ, LDR_DIR, LDR_CIMA ou LDR_BAIXO.\n",
+        printk("LDR invalido (%d). Use um valor de ldr_id_t (sup-esq, sup-dir, inf-esq, inf-dir).\n",
                (int)id);
         return -EINVAL;
     }

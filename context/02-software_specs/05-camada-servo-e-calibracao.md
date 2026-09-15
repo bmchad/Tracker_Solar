@@ -1,7 +1,7 @@
 # Camada de servo e calibração
 
 Arquivos: `lib/servo/servo.c` e `lib/servo/servo.h` — renomeados de
-`lib/servo_motor/sevo_angulo_tenpo.c` e `servo_angulo_tempo.h` (**D-32**: o arquivo `.c` está com
+`lib/servo_motor/sevo_motor.c` e `servo_motor.h` — renomeados em 2026-09-15 (**D-32**: o `.c` está com
 typo em duas letras, "sevo" e "tenpo").
 
 ⭐ Implemente esta spec **antes** do controle. Enquanto cada comando bloquear 1–2 s, o período de

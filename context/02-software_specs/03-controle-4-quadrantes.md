@@ -15,22 +15,30 @@ Logo a mistura é subtração direta:
 
 ```c
 /* ⭐ A MATRIZ DE MISTURA. É o único lugar que conhece a geometria óptica.
-   Arranjo atual: 2x2 com aleta em X, então cada quadrante é uma direção.
+   Arranjo atual: 2x2 com aleta em CRUZ (+), então cada quadrante é uma
+   DIAGONAL - e cada eixo sai de uma SOMA DE PARES.
 
-   Se a aleta virar um "+", os quadrantes passam a ser diagonais e ISTO
-   é a única coisa que muda no projeto inteiro:
-       *erro_h = (mv[SUP_ESQ] + mv[INF_ESQ]) - (mv[SUP_DIR] + mv[INF_DIR]);
-       *erro_v = (mv[SUP_ESQ] + mv[SUP_DIR]) - (mv[INF_ESQ] + mv[INF_DIR]);
+   Se a aleta voltar a ser um "X", cada sensor volta a apontar para uma
+   direção e ISTO é a única coisa que muda no projeto inteiro:
+       *erro_h = mv[ESQ]  - mv[DIR];
+       *erro_v = mv[CIMA] - mv[BAIXO];
 
    O SINAL depende da topologia do divisor, e ela está fechada (P-03): pull-down,
    10 kOhm para GND e LDR para 3,3 V, logo mais luz => mais tensão e as duas
-   subtrações valem como estão. Se a montagem virar pull-up, inverta os dois. */
+   contas valem como estão. Se a montagem virar pull-up, inverta as duas. */
 static void controle_erros(const int32_t mv[LDR_COUNT], int32_t *erro_h, int32_t *erro_v)
 {
-    *erro_h = mv[LDR_ESQ]  - mv[LDR_DIR];
-    *erro_v = mv[LDR_CIMA] - mv[LDR_BAIXO];
+    *erro_h = (mv[LDR_SUP_ESQ] + mv[LDR_INF_ESQ])
+            - (mv[LDR_SUP_DIR] + mv[LDR_INF_DIR]);
+
+    *erro_v = (mv[LDR_SUP_ESQ] + mv[LDR_SUP_DIR])
+            - (mv[LDR_INF_ESQ] + mv[LDR_INF_DIR]);
 }
 ```
+
+⚠️ **O erro tem o DOBRO da magnitude que teria no arranjo em X**, porque cada lado é a soma de dois
+sensores. As constantes de calibração abaixo foram reescaladas na mesma proporção — e continuam
+sendo chute, só que chute reescalado.
 
 Erro positivo em `erro_h` significa "sol mais à esquerda". Que sentido de rotação isso pede depende
 de como o servo está montado — o código atual soma `correcao` para ir à esquerda, e essa convenção
@@ -72,8 +80,8 @@ assentar mal que produz zig-zag.
 ```c
 /* ⚠️ Valores INICIAIS. Calibrar com as medições de P-04 antes de confiar.
    ZONA_MORTA_MV tem de ficar ACIMA do ruído medido com a placa no alvo. */
-#define ZONA_MORTA_MV       30   /* abaixo disto é ruído/nuvem: não mexe */
-#define GANHO_MV_POR_GRAU   25   /* quantos mV de erro valem 1 grau de correção */
+#define ZONA_MORTA_MV       60   /* abaixo disto é ruído/nuvem: não mexe */
+#define GANHO_MV_POR_GRAU   50   /* quantos mV de erro valem 1 grau de correção */
 #define PASSO_MIN_GRAUS      2   /* menor movimento que o servo faz de forma confiável */
 #define PASSO_MAX_GRAUS     15   /* teto: um salto grande é ou erro de leitura ou nuvem */
 ```

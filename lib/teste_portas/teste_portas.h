@@ -29,4 +29,9 @@ void teste_portas_servo(void);
    Ver context/CONTINUAR-AQUI.md. */
 void teste_portas_recibo(void);
 
+/* Liga/desliga o LED do teste. Existe para que um teste de bancada consiga
+   dizer "estou girando AGORA" sem depender da serial - que na investigacao de
+   2026-09-14 passou dois dias muda. */
+void teste_portas_led(int aceso);
+
 #endif /* TESTE_PORTAS_H */

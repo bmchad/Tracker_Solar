@@ -164,14 +164,19 @@ Confirmar que não há nada de valor só nele (o remoto ainda existe no GitHub) 
 | Caminho atual | Problema |
 |---|---|
 | `lib/angulo_incidência_solar/` | **`ê` não-ASCII** no nome do diretório |
-| `lib/servo_motor/sevo_angulo_tenpo.c` | typo em duas letras: "sevo", "tenpo" |
+| `lib/servo_motor/sevo_motor.c` | ⚠️ typo **parcialmente** corrigido em 2026-09-15: "tenpo" saiu, **"sevo" ficou** |
 
 O acento é o mais sério dos dois. Caminho não-ASCII atravessa CMake, Ninja, o shell do Windows e o
 toolchain ARM, e cada um tem sua própria opinião sobre codificação de página de código. Funciona
 nesta máquina; é exatamente o tipo de coisa que quebra em outra, ou num runner de CI, com mensagem
 de erro que não menciona o acento.
 
-O typo é cosmético, mas dobra: `sevo_angulo_tenpo.c` implementa o que `servo_angulo_tempo.h`
+⭐ **Metade disto foi resolvida em 2026-09-15**, junto com a virada para rotação contínua: os
+arquivos viraram `servo_motor.h` e `sevo_motor.c`, e o nome deixou de prometer "ângulo" — o que era
+a parte que **mentia**, já que a API passou a falar direção e tempo. O que sobrou é cosmético: o
+`.c` ainda começa com **`sevo`**, sem o `r`.
+
+O typo original era pior porque dobrava: `sevo_angulo_tenpo.c` implementava o que `servo_angulo_tempo.h`
 declara — os dois nomes são diferentes, e procurar pelo arquivo pelo nome do header não o encontra.
 
 As specs já preveem os dois renomeados para `lib/sol/` e `lib/servo/servo.c` — ver
@@ -203,7 +208,10 @@ IntelliSense apontar para os arquivos errados.
 
 ## D-34 — Headers sem include guard, macros duplicados, protótipo vazio
 
-**`lib/servo_motor/servo_angulo_tempo.h`** e **`lib/testes/testes.h`**, os dois:
+**`lib/servo_motor/servo_motor.h`** (ex-`servo_angulo_tempo.h`) e **`lib/testes/testes.h`**.
+⭐ **O header de servo saiu desta lista em 2026-09-15**, na virada para rotacao continua: ganhou
+include guard, passou a incluir so `<stdint.h>` e parou de redefinir os quatro macros. O que
+segue vale para o `testes.h`, e valia para os dois:
 
 1. **Sem include guard.** Nenhum `#ifndef`. Nada impede dupla inclusão; hoje passa porque nenhum
    dos dois inclui o outro.
@@ -238,7 +246,7 @@ uso aqui.
 | `int direcao = 1;` | `src/main.c:57` | atribuído, nunca lido |
 | `double N` | `angulo_incidencia_solar.c:111` | duração da insolação, calculada e descartada |
 | `static int ano` | `angulo_incidencia_solar.c:13` | declarado, nunca usado — é a **ausência dele** que faz o dia do ano ignorar ano bissexto (D-16) |
-| `INPUT_PORT` / `INPUT_PIN` | `main.c`, `testes.c`, `servo_angulo_tempo.h` | gpiod pino 20; resquício do sensor de linha do carrinho |
+| `INPUT_PORT` / `INPUT_PIN` | `main.c` (o header de servo deixou de defini-los em 2026-09-15) | gpiod pino 20; resquício do sensor de linha do carrinho |
 | `SLEEP_TIME_MS` | os mesmos três arquivos | nunca usado |
 
 `N` e `ano` merecem nota: os dois são *quase* usados. `N` seria útil para decidir dia e noite pela

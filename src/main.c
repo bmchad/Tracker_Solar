@@ -1,10 +1,10 @@
 /* NOTAS
 pwm do horizontal = ptd3
 pwm do vertical = ptd0
-ldr da direita no canal ptb2
-ldr da esquerda no canal ptb0
-ldr de cima no canal ptb1
-ldr de baixo no canal ptb3
+ldr superior esquerdo no ptb0
+ldr inferior esquerdo no ptb1
+ldr superior direito no ptb2
+ldr inferior direito no ptb3
 os quatro ldr sao ptb0..ptb3 = A0..A3, contiguos no header arduino
 em angulo_incidencia_solar.c preencha dia mes ano latitude etc
 em init_hora.c coloque hora, minuto segundo
@@ -17,7 +17,7 @@ em init_hora.c coloque hora, minuto segundo
 #include <ldr.h>
 #include <init_hora.h>              // Biblioteca do relógio de software
 #include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
-#include <servo_angulo_tempo.h>
+#include <servo_motor.h>
 #include <testes.h>
 #include <teste_portas.h>
 #include <teste_rot_cont.h>
@@ -84,14 +84,25 @@ int main(void){
        12 min 40 s de sono bloqueante em TODO boot, antes da primeira leitura de
        tracking. Agora sao opt-in de compilacao - ver platformio.ini. */
 //#ifdef RODAR_TESTES_NO_BOOT
-    /* RECIBO DE GRAVACAO: pisca 3x na cor de LED_DO_TESTE antes de qualquer
-       coisa girar. Troque a cor a cada build - se a placa nao mudar de cor,
-       o upload nao chegou, e nada do que se medir depois significa nada. */
-    /* Servo de ROTACAO CONTINUA: pulso e velocidade, nao angulo.
-       O teste_motores() varre ANGULOS e nao faz sentido para ele. */
-    teste_rot_cont();
+    /* ⭐ QUAL TESTE DE BANCADA RODA NO BOOT. Ligue UM de cada vez: os tres sao
+       lacos infinitos e nao devolvem o controle.
 
-    //teste_motores();
+       Todos comecam piscando o LED (recibo de gravacao): se a cor nao mudou
+       desde o build anterior, o upload nao chegou ao alvo, e nada do que se
+       medir depois significa coisa alguma. A cor esta em LED_DO_TESTE, no
+       teste_portas.c. */
+#define TESTE_VELOCIDADE   0   /* gira devagar de um lado, para, do outro      */
+#define TESTE_MEDIR_OMEGA  1   /* ⭐ o ritual: 4 numeros (2 eixos x 2 sentidos) */
+#define TESTE_CAMADA_SERVO 0   /* direcao+tempo: odometria e limite de curso   */
+
+#if TESTE_VELOCIDADE
+    teste_rot_cont();
+#elif TESTE_MEDIR_OMEGA
+    teste_rot_cont_medir_omega();
+#elif TESTE_CAMADA_SERVO
+    teste_motores();
+#endif
+
     //teste_ldr();
     //printk("Testes terminados, começando o tracker...\n");
 //#else

@@ -34,10 +34,10 @@ teste) e a decisão é quebra limpa — ver [../20-decisoes.md](../20-decisoes.m
 /* ⚠️ A ORDEM deste enum é a ordem de io-channels no zephyr/frdm_kl25z.overlay.
    Os dois lados têm de casar, e nada no build pega a divergência. */
 typedef enum {
-    LDR_ESQ = 0,
-    LDR_DIR,
-    LDR_CIMA,
-    LDR_BAIXO,
+    LDR_SUP_ESQ = 0,   /* PTB0 = A0 = SE8  */
+    LDR_SUP_DIR,       /* PTB2 = A2 = SE12 */
+    LDR_INF_ESQ,       /* PTB1 = A1 = SE9  */
+    LDR_INF_DIR,       /* PTB3 = A3 = SE13 */
     LDR_COUNT          /* sempre por último: é o tamanho, não um sensor */
 } ldr_id_t;
 
@@ -68,10 +68,10 @@ sem retorno. Ver D-36.
 #define ADC_NODE DT_PATH(zephyr_user)
 
 static const struct adc_dt_spec canais[LDR_COUNT] = {
-    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 0),   /* LDR_ESQ   */
-    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 1),   /* LDR_DIR   */
-    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 2),   /* LDR_CIMA  */
-    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 3),   /* LDR_BAIXO */
+    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 0),   /* LDR_SUP_ESQ */
+    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 1),   /* LDR_SUP_DIR */
+    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 2),   /* LDR_INF_ESQ */
+    ADC_DT_SPEC_GET_BY_IDX(ADC_NODE, 3),   /* LDR_INF_DIR */
 };
 ```
 

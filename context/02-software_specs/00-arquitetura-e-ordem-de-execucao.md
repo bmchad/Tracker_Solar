@@ -30,7 +30,7 @@ Três renomeações/criações:
 | Diretório hoje | Vira | Por quê |
 |---|---|---|
 | `lib/angulo_incidência_solar/` | `lib/sol/` | remove o **acento** do caminho (D-32) e o escopo deixa de ser só um ângulo |
-| `lib/servo_motor/` (`sevo_angulo_tenpo.c`) | `lib/servo/` (`servo.c`) | corrige o typo do arquivo (D-32) |
+| `lib/servo_motor/` (`sevo_motor.c`) | `lib/servo/` (`servo.c`) | ⚠️ renomeado pela metade em 2026-09-15: o `tenpo` saiu, o **`sevo`** ficou (D-32) |
 | — | `lib/controle/` | a mistura dos quadrantes e a decisão de passo, hoje inline no `main.c` |
 
 ⭐ **`lib/controle/` existe para ser puro.** Ele recebe quatro valores em mV e a posição atual, e

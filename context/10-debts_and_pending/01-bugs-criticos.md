@@ -140,7 +140,8 @@ depois: 10°–160° provisório), o modo de falha era **mecânico**.
 
 ## D-05 — O servo **envolvia** o ângulo em vez de saturar ✅
 
-**Onde era:** `lib/servo_motor/sevo_angulo_tenpo.c:21-26` e `:33-38` (as duas funções, idênticas).
+**Onde era:** `lib/servo_motor/sevo_motor.c:21-26` e `:33-38`, quando o arquivo ainda se chamava
+`sevo_angulo_tenpo.c` (as duas funções, idênticas).
 
 ```c
 while(ang>180){ ang-=180; }
@@ -184,7 +185,8 @@ Sem a flag, o boot imprime uma linha dizendo que os testes estão desligados e e
 ## D-07 — `testes.c` chamava as funções de servo sem incluir o header ✅
 
 **Onde era:** `lib/testes/testes.c` incluía `pwm_z42.h`, `ldr.h`, `init_hora.h`,
-`angulo_incidencia_solar.h` e `testes.h`, mas **não** `servo_angulo_tempo.h` — e chamava
+`angulo_incidencia_solar.h` e `testes.h`, mas **não** o header de servo (então `servo_angulo_tempo.h`,
+hoje `servo_motor.h`) — e chamava
 `servo_horizontal_angulo_tempo()` / `servo_vertical_angulo_tempo()` em quatro linhas.
 
 Declaração implícita: o compilador assumia `int f()` e **parava de conferir os argumentos**. Passava

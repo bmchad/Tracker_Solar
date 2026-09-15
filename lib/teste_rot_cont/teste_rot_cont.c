@@ -1,7 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <pwm_z42.h>
-#include <teste_portas.h>      /* teste_portas_recibo(): o LED como recibo */
+#include <teste_portas.h>      /* recibo de gravacao e controle do LED */
 #include <teste_rot_cont.h>
 
 /* ---------------------------------------------------------------------------
@@ -67,5 +67,57 @@ void teste_rot_cont(void)
         aplicar("parado (neutro)",     CNV_NEUTRO);
         aplicar("sentido B, devagar",  CNV_SENTIDO_B);
         aplicar("parado (neutro)",     CNV_NEUTRO);
+    }
+}
+
+/* --- Medicao de omega ------------------------------------------------------ */
+
+#define OMEGA_MS_GIRO      5000   /* 5 s girando: o varrido a medir      */
+#define OMEGA_MS_PAUSA     8000   /* 8 s parado: tempo de marcar e medir */
+
+/* Velocidade da MEDICAO. ⚠️ Tem de ser a MESMA que a camada de servo usa em
+   operacao (VELOCIDADE_PCT no sevo_motor.c), senao o omega medido nao
+   descreve o movimento real - velocidade diferente, omega diferente. */
+#define OMEGA_VEL_PCT        30
+#define OMEGA_PASSO        ((EXCURSAO_MAX * OMEGA_VEL_PCT) / 100)
+
+static void medir_um(const char *eixo, uint16_t canal,
+                     const char *sentido, uint16_t cnv)
+{
+    printk("\n[omega] %s / %s: MARQUE a posicao agora (%d s)\n",
+           eixo, sentido, OMEGA_MS_PAUSA / 1000);
+    teste_portas_led(0);
+    k_msleep(OMEGA_MS_PAUSA);
+
+    printk("[omega] %s / %s: GIRANDO por %d s...\n",
+           eixo, sentido, OMEGA_MS_GIRO / 1000);
+    teste_portas_led(1);
+    pwm_tpm_CnV(TPM0, canal, cnv);
+    k_msleep(OMEGA_MS_GIRO);
+    pwm_tpm_CnV(TPM0, canal, CNV_NEUTRO);
+    teste_portas_led(0);
+
+    printk("[omega] %s / %s: PARADO. Meca o varrido; omega = angulo / %d s\n",
+           eixo, sentido, OMEGA_MS_GIRO / 1000);
+}
+
+void teste_rot_cont_medir_omega(void)
+{
+    printk("\n=== MEDICAO DE OMEGA (graus/s) ===\n");
+    printk("LED ACESO = girando. LED APAGADO = marque ou meca.\n");
+    printk("Sao QUATRO numeros: cada eixo em cada sentido - servo de rotacao\n");
+    printk("continua e assimetrico, e um omega so embute erro que acumula.\n");
+
+    teste_portas_recibo();
+
+    for (;;) {
+        medir_um("horizontal", CANAL_HORIZONTAL, "sentido A",
+                 CNV_NEUTRO + OMEGA_PASSO);
+        medir_um("horizontal", CANAL_HORIZONTAL, "sentido B",
+                 CNV_NEUTRO - OMEGA_PASSO);
+        medir_um("vertical",   CANAL_VERTICAL,   "sentido A",
+                 CNV_NEUTRO + OMEGA_PASSO);
+        medir_um("vertical",   CANAL_VERTICAL,   "sentido B",
+                 CNV_NEUTRO - OMEGA_PASSO);
     }
 }

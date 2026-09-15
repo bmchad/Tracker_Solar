@@ -125,7 +125,7 @@ spec do feedforward.
 
 ## D-14 — Servo bloqueante torna a amostragem irregular
 
-**Onde:** `lib/servo_motor/sevo_angulo_tenpo.c:29` e `:41`.
+**Onde:** `lib/servo_motor/sevo_motor.c:29` e `:41` (ex-`sevo_angulo_tenpo.c`).
 
 ```c
 k_msleep((int)(1000 * t));   /* t em segundos INTEIROS: 1 ou 2 */
