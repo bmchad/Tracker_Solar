@@ -17,7 +17,15 @@
    ⚠️ NAO inicializa hardware: recebe o ADC ja pronto, porque quem inicializa e
    o main(). E o D-02 - antes cada rotina repetia as chamadas de init, e
    pwm_tpm_Init faz `tpm->SC |= ...`, um OR e nao uma escrita, entao
-   reinicializar com parametros diferentes ACUMULA bits em vez de substituir. */
+   reinicializar com parametros diferentes ACUMULA bits em vez de substituir.
+
+   `n` = numero de leituras, uma a cada 500 ms. ⏱ 0,5 s por repeticao.
+   ⚠️ **n = 0 e INFINITO**, nao "nenhuma" - mesma convencao dos testes de
+   rotacao e do teste_console.
+
+   ⭐ E o infinito e o modo mais util deste teste: o PISO DE RUIDO, que e o que
+   calibra MARGEM_MV, sai de deixar a placa parada por um minuto olhando a
+   variacao - nao de dez leituras em cinco segundos. */
 int teste_ldr(int n);
 
 #endif /* TESTE_LDR_H */

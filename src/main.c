@@ -159,7 +159,7 @@ int main(void){
        COR_DESTA_GRAVACAO em pisca_led.h a cada build. */
     led(COR_DESTA_GRAVACAO);
 
-    teste_console(10); //teste_console(0) testa infinitamente o console
+    teste_console(10);   /* a serial vive? 0,5 s cada; n = 0 e infinito */
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
     pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
@@ -181,27 +181,37 @@ int main(void){
     // Inicia o relógio usando os valores que o usuário digitou no init_hora.c
     relogio_init();
 
-    /* ⭐ ORIGEM DA ODOMETRIA. O bloco de NOTAS no topo manda posicionar o
-       tracker a mao antes de ligar; e AQUI que esse instante vira o zero.
+    /* ⚠️ TESTES DE BANCADA. Todos RETORNAM agora, entao podem ser encadeados -
+       mas cada um custa tempo de boot, e o custo esta anotado. Comente os que
+       nao estiver usando.
+
+       ⚠️ `n = 0` e INFINITO nos quatro, nao "nenhuma repeticao".
+
+       Ordem util quando se quer medir tudo: console (a serial vive?) -> omega
+       (a odometria depende dele) -> posicao -> LDR. */
+
+    teste_rot_cont(5);               /* o servo gira?          4 s cada  =  20 s */
+    teste_rot_cont_medir_omega(1);   /* quanto vale omega?    52 s cada  =  52 s */
+    teste_medicao_posicao_vertical();     /* odometria e limite, pela camada: 8 s */
+    teste_medicao_posicao_horizontal();   /*                                 14 s */
+    teste_ldr(10);                   /* 4 quadrantes, soma de pares    0,5 s cada */
+
+    /* ⭐ ORIGEM DA ODOMETRIA, e ela vem DEPOIS dos testes de proposito.
+
+       ⛔ Zerar antes deles era um BUG: teste_rot_cont() e medir_omega() giram
+       por CnV cru, centenas de graus, sem tocar em theta; e os testes de posicao
+       terminam com theta NO EXTREMO (+1200 no horizontal, +500 no vertical).
+       O laco comecava entao acreditando estar no fim de curso, e ms_que_cabem()
+       devolvia 0 para um dos sentidos - o tracker recusava metade das correcoes
+       desde o primeiro ciclo, no meio do curso fisico real.
 
        ⚠️ A origem precisa ser o CENTRO do curso util, nao um ponto qualquer: a
-       janela de limite e simetrica (+-120 no horizontal, +-50 no vertical),
-       entao zerar fora do meio faz um dos lados nao caber. */
+       janela de limite e simetrica, entao zerar fora do meio faz um dos lados
+       nao caber. O bloco de NOTAS no topo manda posicionar o tracker a mao antes
+       de ligar - se algum teste acima girou os eixos, reposicione A MAO antes de
+       confiar no laco. */
     servo_zerar_horizontal();
     servo_zerar_vertical();
-
-    /* ⛔ ESCOLHA UM MODO. Tudo aqui fica COMENTADO quando o tracker roda - os
-       quatro primeiros nunca devolvem o controle ou consomem minutos, e o laco
-       de tracking nunca comecaria.
-
-       Ordem util quando se quer medir: console (a serial vive?) -> omega (a
-       odometria depende dele) -> posicao -> LDR. */
-
-    teste_rot_cont(5);              /* o servo gira? NAO RETORNA                */
-    teste_rot_cont_medir_omega(5);  /* quanto vale omega? NAO RETORNA           */
-    teste_medicao_posicao_vertical();    /* odometria e limite, pela camada    */
-    teste_medicao_posicao_horizontal();
-    teste_ldr(10);                   /* os 4 quadrantes e a soma de pares        */
 
     /* --- LACO DE TRACKING --------------------------------------------------
 

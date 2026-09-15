@@ -80,7 +80,11 @@ void teste_rot_cont(int n)
 
     recibo();   /* pisca o LED: prova que esta gravacao chegou */
 
-    for (int i=0; i<n; i++) {
+    /* n == 0 e INFINITO, seguindo a convencao que teste_console() estabeleceu.
+       Os quatro testes do projeto usam a mesma - "0 = nao faz nada" num e
+       "0 = para sempre" noutro seria a pior armadilha possivel numa API que
+       parece igual. */
+    for (int i = 0; n == 0 || i < n; i++) {
         led(COR_DESTA_GRAVACAO);
         aplicar("sentido A, devagar",  CNV_SENTIDO_A);
         led(LED_APAGADO);
@@ -136,7 +140,12 @@ void teste_rot_cont_medir_omega(int n)
 
     recibo();
 
-    for (int i=0; i<n; i++) {
+    /* n == 0 e INFINITO - ver a nota em teste_rot_cont().
+
+       ⚠️ Uma passada JA DA os quatro numeros: este teste e um ritual humano
+       (8 s parado para voce marcar, 5 s girando para voce medir o arco), e
+       repetir so repete a mesma medida. Cada repeticao custa 52 s. */
+    for (int i = 0; n == 0 || i < n; i++) {
         medir_um("horizontal", CANAL_HORIZONTAL, "sentido A",
                  CNV_NEUTRO + OMEGA_PASSO);
         medir_um("horizontal", CANAL_HORIZONTAL, "sentido B",

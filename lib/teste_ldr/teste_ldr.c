@@ -39,7 +39,10 @@ int teste_ldr(int n)
        encostadas, sem printk no meio. Quatro ldr_ler() com log entre eles
        mediriam quatro instantes diferentes (a serial a 115200 gasta ~3 ms por
        linha), e a diferenca entre quadrantes viraria em parte temporal. */
-    for (int i = 0; i < n; i++) {
+    /* n == 0 e INFINITO, na mesma convencao dos outros tres testes. Aqui ele e
+       o modo mais util: para medir o PISO DE RUIDO precisa-se da placa parada
+       por um minuto, e nao de dez leituras em cinco segundos. */
+    for (int i = 0; n == 0 || i < n; i++) {
         int32_t mv[LDR_COUNT] = {0};
         int err = ldr_ler_todos(mv);
 
