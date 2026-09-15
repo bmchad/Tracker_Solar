@@ -39,13 +39,13 @@ static int servo_saturar(int ang){
 void servo_horizontal_angulo_tempo(int ang, int t){
     ang = servo_saturar(ang);
     // 375 é o offset para 1ms (0 graus), (750-375) = variação para até 2ms (180 graus)
-    pwm_tpm_CnV(TPM0, 3, (375 +(1.21*ang * 375 / 180))); //1a correcao: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 //segunda correcao: multiplico denovo por 140/180 -> 1,21
+    pwm_tpm_CnV(TPM0, 3, (375 +(ang * 375 / 180))); //1a correcao: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 //segunda correcao: multiplico denovo por 140/180 -> 1,21
     k_msleep((int)(1000 * t));
 }
 
 void servo_vertical_angulo_tempo(int ang, int t){
     ang = servo_saturar(ang);   /* D-05 */
     // 375 é o offset para 1ms (0 graus), (750-375) = variação para até 2ms (180 graus)
-    pwm_tpm_CnV(TPM0, 0, (375 + (1.21*ang * 375 / 180))); //1a correção: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 // 2a correcao: multiplico por 170/180 -> 1,555*170/180 = 1,47
+    pwm_tpm_CnV(TPM0, 0, (375 + (ang * 375 / 180))); //1a correção: aqui multiplico por 2 para tentar corrigir e multiplico por 140/180 para aplicar uma correção empírica -> 2*140/180 = 1,555 // 2a correcao: multiplico por 170/180 -> 1,555*170/180 = 1,47
     k_msleep((int)(1000 * t));
 }

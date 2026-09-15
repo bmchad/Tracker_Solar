@@ -32,7 +32,7 @@
 
    ⚠️ Onde exatamente comeca o estalo e o que o P-08 quer medir - e isso merece
    um teste dedicado e curto, nao uma varredura infinita passando por cima. */
-#define ANG_MAX_HORIZONTAL 180
+#define ANG_MAX_HORIZONTAL 160
 #define ANG_MAX_VERTICAL   160
 
 /* D-02: sem pwm_tpm_Init nem ldr_inicializar aqui. O main() ja fez. */
@@ -45,20 +45,20 @@ int teste_motores(void){
 
     for(int i=0;; i++){
         //teste de motores horizontais
-        for(int angulo = 0; angulo <= ANG_MAX_HORIZONTAL; angulo += 10){
+        for(int angulo = 0; angulo <= ANG_MAX_HORIZONTAL; angulo += 5){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
-        for(int angulo = ANG_MAX_HORIZONTAL; angulo >= 0; angulo -= 10){
+        for(int angulo = ANG_MAX_HORIZONTAL; angulo >= 0; angulo -= 5){
             servo_horizontal_angulo_tempo(angulo, 1);
             printk("Angulo horizontal: %d\n", angulo);
         }
         //teste de motores verticais
-        for(int angulo = 0; angulo <= ANG_MAX_VERTICAL; angulo += 10){
+        for(int angulo = 0; angulo <= ANG_MAX_VERTICAL; angulo += 5){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
-        for(int angulo = ANG_MAX_VERTICAL; angulo >= 0; angulo -= 10){
+        for(int angulo = ANG_MAX_VERTICAL; angulo >= 0; angulo -= 5){
             servo_vertical_angulo_tempo(angulo, 1);
             printk("Angulo vertical: %d\n", angulo);
         }
