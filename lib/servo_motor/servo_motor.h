@@ -41,7 +41,7 @@ typedef enum {
    correcao mais fina que ele existe. Com omega de 60 graus/s sao 9 graus, e e
    esse piso que obriga o controle a ter zona morta maior que ele. Ver o .c
    sobre por que comando curto demais mente para a odometria. */
-#define SERVO_MS_MIN   150
+#define SERVO_MS_MIN   100
 
 /* Gira no sentido dado, em VELOCIDADE FIXA, por `ms` milissegundos, e para.
    Bloqueante.

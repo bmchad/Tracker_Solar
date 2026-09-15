@@ -41,7 +41,7 @@ deixou de ser chamado. Ver o comentario no fim deste arquivo.
 
 #define MARGEM_MV        60   /* diferenca abaixo disto e ruido/nuvem         */
 
-#define PASSO_MS        200   /* passo fixo. graus = PASSO_MS * omega / 1000, */
+#define PASSO_MS        100   /* passo fixo. graus = PASSO_MS * omega / 1000, */
                               /* ou ~12 graus com omega = 60 graus/s          */
 
 /* ⛔ Passo abaixo do minimo da camada faria o tracker NUNCA mover, e em
