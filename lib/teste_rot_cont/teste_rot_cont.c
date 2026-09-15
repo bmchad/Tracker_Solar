@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <pwm_z42.h>
+#include <servo_motor.h>       /* a camada: usada SO pela medicao de posicao */
 #include <teste_portas.h>      /* recibo de gravacao e controle do LED */
 #include <teste_rot_cont.h>
 
@@ -17,18 +18,16 @@
    Logo a excursao de velocidade e +-188 contagens em torno do neutro, e "x% da
    velocidade" e simplesmente x% dessas 188.
    --------------------------------------------------------------------------- */
-#define MOD_50HZ         7500
 #define CNV_NEUTRO        563   /* 1,50 ms - parado                            */
 #define EXCURSAO_MAX      188   /* 0,50 ms - do neutro ate a velocidade maxima */
 
-/* ⚠️ 10% e POUCO, e pode nao ser suficiente para o servo sair do lugar.
-   Servo de rotacao continua tem uma ZONA MORTA em torno do neutro, tipicamente
-   de +-45 a +-90 us. E 10% de 0,50 ms sao 50 us - ou seja, bem dentro dessa
-   faixa em muitos servos.
+/* ⚠️ Percentual BAIXO pode nao ser suficiente para o servo sair do lugar.
+   Servo de rotacao continua tem ZONA MORTA em torno do neutro, tipicamente de
+   +-45 a +-90 us; 10% de 0,50 ms sao 50 us - dentro dessa faixa em muitos
+   servos.
 
-   ⭐ Se o eixo nao se mexer, NAO e defeito: suba este numero para 25 ou 30 e
-   grave de novo. O primeiro valor em que ele comeca a girar E a zona morta
-   medida, e vale anotar. */
+   ⭐ Se o eixo nao se mexer, NAO e defeito: suba este numero. O primeiro valor
+   em que ele comeca a girar E a zona morta medida, e vale anotar. */
 #define VELOCIDADE_PCT     10
 
 #define PASSO_CNV        ((EXCURSAO_MAX * VELOCIDADE_PCT) / 100)
@@ -57,29 +56,37 @@ void teste_rot_cont(void)
     printk("\n=== TESTE DE ROTACAO CONTINUA ===\n");
     printk("Pulso = VELOCIDADE, nao angulo. Neutro=%u, passo=%u (%d%% da "
            "velocidade maxima)\n", CNV_NEUTRO, PASSO_CNV, VELOCIDADE_PCT);
-    printk("Se o eixo nao girar, suba VELOCIDADE_PCT: 10%% cai dentro da zona\n"
-           "morta de muitos servos.\n\n");
+    printk("Se o eixo nao girar, suba VELOCIDADE_PCT: percentual baixo cai\n"
+           "dentro da zona morta de muitos servos.\n\n");
 
     teste_portas_recibo();   /* pisca o LED: prova que esta gravacao chegou */
 
     for (;;) {
+        teste_portas_led(1);
         aplicar("sentido A, devagar",  CNV_SENTIDO_A);
+        teste_portas_led(0);
         aplicar("parado (neutro)",     CNV_NEUTRO);
+        teste_portas_led(1);
         aplicar("sentido B, devagar",  CNV_SENTIDO_B);
+        teste_portas_led(0);
         aplicar("parado (neutro)",     CNV_NEUTRO);
     }
 }
 
-/* --- Medicao de omega ------------------------------------------------------ */
+/* --- Medicao de omega: CnV cru, por fora da camada ------------------------- */
 
 #define OMEGA_MS_GIRO      5000   /* 5 s girando: o varrido a medir      */
 #define OMEGA_MS_PAUSA     8000   /* 8 s parado: tempo de marcar e medir */
 
-/* Velocidade da MEDICAO. ⚠️ Tem de ser a MESMA que a camada de servo usa em
-   operacao (VELOCIDADE_PCT no sevo_motor.c), senao o omega medido nao
-   descreve o movimento real - velocidade diferente, omega diferente. */
-#define OMEGA_VEL_PCT        30
-#define OMEGA_PASSO        ((EXCURSAO_MAX * OMEGA_VEL_PCT) / 100)
+/* ⚠️ A velocidade da MEDICAO tem de ser a MESMA da OPERACAO, senao o omega
+   medido nao descreve o movimento real. Por isso ela NAO e um numero proprio:
+   sai do VELOCIDADE_PCT deste arquivo, que deve espelhar o VELOCIDADE_PCT_H/V
+   da camada de servo.
+
+   ⛔ Os dois ja divergiram uma vez - este teste ficou em 30 enquanto a camada
+   foi para 10 -, e o comentario que avisava disso nao impediu. Repetir o numero
+   e o mecanismo da divergencia; derivar e a defesa. */
+#define OMEGA_PASSO        PASSO_CNV
 
 static void medir_um(const char *eixo, uint16_t canal,
                      const char *sentido, uint16_t cnv)
@@ -120,4 +127,98 @@ void teste_rot_cont_medir_omega(void)
         medir_um("vertical",   CANAL_VERTICAL,   "sentido B",
                  CNV_NEUTRO - OMEGA_PASSO);
     }
+}
+
+/* --- Medicao de posicao: o unico teste que passa PELA CAMADA --------------- */
+
+#define POSICAO_PASSO_MS    500   /* duracao de cada comando                  */
+#define POSICAO_PAUSA_MS   1000   /* parado entre varreduras                  */
+
+/* ⚠️ Teto de seguranca, nao criterio de parada: quem para a varredura e o
+   LIMITE DE CURSO da camada, devolvendo 0. Se a varredura chegar a este teto,
+   e sinal de que a camada NAO esta saturando - omega subestimado, limite que
+   nunca chega. Chegar aqui e um achado, nao um fim normal. */
+#define POSICAO_MAX_PASSOS   60
+
+/* Uma varredura num sentido, ate a camada recusar. Devolve quantos comandos
+   foram aceitos - numero util para conferir contra a conta: com omega de
+   60 graus/s e passos de 500 ms, cada comando vale 30 graus, entao o limite de
+   120 graus cai em ~4 comandos. */
+static int varrer(const char *eixo, const char *sentido, servo_dir_t dir,
+                  uint32_t (*mover)(servo_dir_t, uint32_t),
+                  int32_t (*theta_d10)(void))
+{
+    int comandos = 0;
+
+    printk("[posicao] %s: varrendo no %s\n", eixo, sentido);
+    teste_portas_led(1);
+
+    for (int i = 0; i < POSICAO_MAX_PASSOS; i++) {
+        uint32_t aplicado = mover(dir, POSICAO_PASSO_MS);
+
+        printk("  pedido=%u ms  aplicado=%u ms  theta=%+d decimos de grau%s\n",
+               (unsigned)POSICAO_PASSO_MS, (unsigned)aplicado, theta_d10(),
+               (aplicado == 0)               ? "   <- LIMITE: sem curso restante"
+             : (aplicado < POSICAO_PASSO_MS) ? "   <- saturou no limite"
+                                             : "");
+
+        if (aplicado == 0) {
+            break;
+        }
+        comandos++;
+    }
+
+    if (comandos >= POSICAO_MAX_PASSOS) {
+        printk("  ⚠️ teto de %d comandos atingido SEM a camada saturar - omega\n"
+               "     esta subestimado, e o limite de curso nao esta protegendo\n",
+               POSICAO_MAX_PASSOS);
+    }
+
+    teste_portas_led(0);
+    k_msleep(POSICAO_PAUSA_MS);
+    return comandos;
+}
+
+/* Varre 0 -> limite num sentido -> volta -> limite no outro -> volta.
+
+   ⚠️ "Voltar" aqui e comandar o sentido oposto ate a camada recusar, nao buscar
+   uma posicao: NAO HA ENCODER. Se o omega estiver errado, o eixo nao fecha no
+   zero fisico de onde partiu - e essa diferenca visivel E o erro acumulado da
+   odometria. E o resultado mais valioso deste teste. */
+static void medir_posicao(const char *eixo,
+                          uint32_t (*mover)(servo_dir_t, uint32_t),
+                          int32_t (*theta_d10)(void),
+                          void (*zerar)(void))
+{
+    printk("\n=== MEDICAO DE POSICAO: eixo %s ===\n", eixo);
+    printk("Origem = onde o eixo esta AGORA (posicione a mao antes de ligar).\n");
+    printk("LED ACESO = girando. LED APAGADO = parado.\n");
+    printk("⭐ MARQUE a posicao de partida: e contra ela que se mede o erro.\n");
+
+    zerar();
+
+    int ida = varrer(eixo, "sentido horario", SERVO_HORARIO, mover, theta_d10);
+    printk("[posicao] %s: %d comandos ate o limite; voltando\n", eixo, ida);
+    varrer(eixo, "anti-horario (voltando)", SERVO_ANTIHORARIO, mover, theta_d10);
+
+    printk("[posicao] %s: agora o outro lado\n", eixo);
+    varrer(eixo, "anti-horario", SERVO_ANTIHORARIO, mover, theta_d10);
+    varrer(eixo, "horario (voltando)", SERVO_HORARIO, mover, theta_d10);
+
+    printk("[posicao] %s: fim. theta = %+d decimos de grau\n",
+           eixo, theta_d10());
+    printk("⚠️ O eixo voltou ao ponto marcado? A diferenca e o erro acumulado\n"
+           "da odometria - e a medida de quanto omega ainda precisa ser medido.\n");
+}
+
+void teste_medicao_posicao_vertical(void)
+{
+    medir_posicao("vertical", servo_vertical_direcao_tempo,
+                  servo_theta_vertical_d10, servo_zerar_vertical);
+}
+
+void teste_medicao_posicao_horizontal(void)
+{
+    medir_posicao("horizontal", servo_horizontal_direcao_tempo,
+                  servo_theta_horizontal_d10, servo_zerar_horizontal);
 }

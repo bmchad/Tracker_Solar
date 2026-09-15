@@ -8,6 +8,10 @@ ldr inferior direito no ptb3
 os quatro ldr sao ptb0..ptb3 = A0..A3, contiguos no header arduino
 em angulo_incidencia_solar.c preencha dia mes ano latitude etc
 em init_hora.c coloque hora, minuto segundo
+
+ANTES DE LIGAR, POSICIONE MANUALMENTE O TRACKER COM A PLACA
+PARALELA AO SOLO E ALINHADA COM O EQUADOR
+
 */
 
 #include <zephyr/kernel.h>             // Funções básicas do Zephyr (ex: k_msleep, k_thread, etc.)
@@ -18,7 +22,7 @@ em init_hora.c coloque hora, minuto segundo
 #include <init_hora.h>              // Biblioteca do relógio de software
 #include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
 #include <servo_motor.h>
-#include <testes.h>
+#include <teste_ldr.h>
 #include <teste_portas.h>
 #include <teste_rot_cont.h>
 
@@ -35,19 +39,12 @@ em init_hora.c coloque hora, minuto segundo
 //função principal
 int main(void){
 
-    /* ANDAIME DE BANCADA - tirar quando o diagnostico fechar.
-       Fica como PRIMEIRA coisa do main de proposito: qualquer coisa capaz de
-       abortar o boot (o ldr_inicializar(), quando voltar) mataria junto o teste
-       que existe para investigar isso. Roda um numero fixo de escadas e cede a
-       vez ao teste_motores() abaixo. */
-    //teste_portas_servo();
+    //teste_portas_servo(); //teste do tpm e das portas usadas na placa
 
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
     pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
     pwm_tpm_Ch_Init(TPM0, 0, TPM_PWM_H, GPIOD, 0);
-
-/*
 
     //configura o ldr
     printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
@@ -65,6 +62,58 @@ int main(void){
     // Inicia o relógio usando os valores que o usuário digitou no init_hora.c
     relogio_init();
 
+    /* ⭐ ORIGEM DA ODOMETRIA. O bloco de NOTAS no topo manda posicionar o
+       tracker a mao antes de ligar; e AQUI que esse instante vira o zero.
+
+       ⚠️ A origem precisa ser o CENTRO do curso util, nao um ponto qualquer: a
+       janela de limite e simetrica (+-120 no horizontal, +-50 no vertical),
+       entao zerar fora do meio faz um dos lados nao caber. */
+    servo_zerar_horizontal();
+    servo_zerar_vertical();
+
+    /* ⚠️ TESTES DE BANCADA - ligue UM de cada vez.
+
+       teste_rot_cont() e teste_rot_cont_medir_omega() sao lacos INFINITOS e nao
+       devolvem o controle; o que vier depois deles nunca roda. As medicoes de
+       posicao e o teste de LDR retornam, entao podem ser encadeados.
+
+       Ordem util quando se quer os tres: medir omega primeiro (a odometria
+       depende dele), depois posicao, depois LDR. */
+
+    //teste_rot_cont();              /* o servo gira? NAO RETORNA              */
+    //teste_rot_cont_medir_omega();  /* quanto vale omega? NAO RETORNA         */
+
+    printk("Iniciando teste de medicao de posicionamento\n");
+    teste_medicao_posicao_vertical();
+    teste_medicao_posicao_horizontal();
+
+    printk("Iniciando teste de LDR\n");
+    teste_ldr();
+
+    /* =====================================================================
+       ⛔ LACO DE TRACKING DESATIVADO EM 2026-09-15 - NAO E ABANDONO, E PORTE
+          PENDENTE. Ele nao LINKA: chama servo_horizontal_angulo_tempo() e
+          servo_vertical_angulo_tempo(), que deixaram de existir quando a camada
+          de servo passou a falar direcao + tempo (os servos sao de rotacao
+          continua e nao tem posicao).
+
+       ⚠️ NAO escreva um wrapper `servo_*_angulo_tempo` chamando a camada nova
+          para "resolver" isto. Seria exatamente a mentira que o refactor
+          removeu: prometer angulo a um dispositivo que so entende velocidade.
+          Foram dois dias de investigacao ate descobrir que era isso.
+
+       O QUE FALTA, quando for portar:
+         - `angulo += correcao` vira `servo_horizontal_direcao_tempo(dir, ms)`;
+         - o limite 10..170 sai: quem limita agora e a odometria, com +-120;
+         - `calcular_theta()` como POSICAO do vertical continua sendo o D-11, e
+           com rotacao continua nem posicao existe para mandar;
+         - `ldr_ler('d'/'e')` virou ldr_ler_todos() com quatro quadrantes em
+           cruz, e a mistura e soma de pares.
+       ===================================================================== */
+#if 0
+    /* Variaveis do controle antigo: 2 LDRs e servo POSICIONAL. Vivem aqui
+       dentro porque so este laco as usa - fora do #if 0 viravam oito avisos de
+       variavel nao utilizada. D-35: `direcao` e atribuida e nunca lida. */
     #define LDR_HISTORY_SIZE 5
     int angulo = 0, correcao = 10, theta = 0;
     int direcao = 1;
@@ -72,55 +121,15 @@ int main(void){
     double valor_ldr_d[LDR_HISTORY_SIZE] = {0};
     double valor_ldr_e[LDR_HISTORY_SIZE] = {0};
     int buffer_cheio = 0;
-
-    // Posiciona o servo na origem inicial
-    servo_horizontal_angulo_tempo(angulo, 1);
-    servo_vertical_angulo_tempo(angulo, 1);
     int contador_vertical = 0;
 
-    */
-
-    /* D-06: os testes eram chamados sem condicao nenhuma e custavam
-       12 min 40 s de sono bloqueante em TODO boot, antes da primeira leitura de
-       tracking. Agora sao opt-in de compilacao - ver platformio.ini. */
-//#ifdef RODAR_TESTES_NO_BOOT
-    /* ⭐ QUAL TESTE DE BANCADA RODA NO BOOT. Ligue UM de cada vez: os tres sao
-       lacos infinitos e nao devolvem o controle.
-
-       Todos comecam piscando o LED (recibo de gravacao): se a cor nao mudou
-       desde o build anterior, o upload nao chegou ao alvo, e nada do que se
-       medir depois significa coisa alguma. A cor esta em LED_DO_TESTE, no
-       teste_portas.c. */
-#define TESTE_VELOCIDADE   0   /* gira devagar de um lado, para, do outro      */
-#define TESTE_MEDIR_OMEGA  1   /* ⭐ o ritual: 4 numeros (2 eixos x 2 sentidos) */
-#define TESTE_CAMADA_SERVO 0   /* direcao+tempo: odometria e limite de curso   */
-
-#if TESTE_VELOCIDADE
-    teste_rot_cont();
-#elif TESTE_MEDIR_OMEGA
-    teste_rot_cont_medir_omega();
-#elif TESTE_CAMADA_SERVO
-    teste_motores();
-#endif
-
-    //teste_ldr();
-    //printk("Testes terminados, começando o tracker...\n");
-//#else
-    //printk("Tracker iniciando (testes desligados; -DRODAR_TESTES_NO_BOOT para ligar).\n");
-//#endif
-/*
     while(1){
         relogio_atualizar(); // Mantém o relógio preciso atualizando as variáveis globais hora_atual, etc.
         
         // Lógica de Dia e Noite
         if (hora_atual >= 18 || hora_atual < 6) {
-            // Modo Noturno: Sem sol, painel descansa para não ficar caçando luz de poste
-            if (angulo != 0) {
-                printk("Fim de tarde! Painel indo dormir (Hora: %02d:%02d)...\n", hora_atual, minuto_atual);
-                angulo = 0;
-                servo_horizontal_angulo_tempo(angulo, 2); // Volta para 0 graus devagar
-                servo_vertical_angulo_tempo(angulo, 2); // Volta para 0 graus devagar
-            }
+            printk("Fim de tarde! Painel indo dormir (Hora: %02d:%02d)...\n",
+                   hora_atual, minuto_atual);
             k_msleep(5000); // Dorme por 5 segundos antes de conferir o relógio de novo
             continue; // Pula toda a lógica do LDR
         }
@@ -216,6 +225,7 @@ int main(void){
         }
                 k_msleep(1000);
     }
-    */
+#endif  /* laco de tracking desativado - ver o bloco acima */
+
     return 0;
 }

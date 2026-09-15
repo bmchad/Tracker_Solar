@@ -7,6 +7,29 @@ typo em duas letras, "sevo" e "tenpo").
 ⭐ Implemente esta spec **antes** do controle. Enquanto cada comando bloquear 1–2 s, o período de
 amostragem é irregular e nenhum filtro em cima dele significa o que promete (**D-14**).
 
+## ⭐ Todo parâmetro de eixo mora no `eixo_t`; o `mover()` guarda só o algoritmo
+
+A camada tem **uma** função interna com a lógica — saturação pela duração restante, recusa de
+comando abaixo da duração mínima, acúmulo de θ — e **nenhum número dentro dela**. Canal, limite de
+curso, pulso de cada sentido e ω de cada sentido vivem no `eixo_t`, separados em `eixo_h` e
+`eixo_v`. As duas funções públicas só escolhem o eixo.
+
+⚠️ **A velocidade quase ficou de fora**, como macro de arquivo, e isso tornava impossível ajustar um
+eixo sem mexer no outro. Ela entrou no struct em 2026-09-15, e o motivo é mais forte que organização:
+
+⛔ **Velocidade e ω são o mesmo fenômeno visto de dois lados.** Mudar a velocidade de um eixo
+**invalida o ω daquele eixo** — e se ele não for medido de novo, a odometria mente, θ deriva, e o
+limite de curso passa a proteger menos do que promete. **Sem nenhum sintoma**, até o painel bater em
+alguma coisa. Os dois campos ficam lado a lado no mesmo struct exatamente para que quem mexer num
+veja o outro.
+
+⚠️ **A alternativa considerada e recusada** foi duplicar a função, uma por eixo. Ela dá liberdade
+para os eixos divergirem, mas espalha a saturação e a odometria em dois lugares — e este projeto já
+pagou por isso: o **D-05** (wrap em vez de clamp) existia nas *duas* funções de servo, que eram
+idênticas, e a correção precisou virar um helper. A regra que ficou: **parâmetro diverge, algoritmo
+não.** Se um dia um eixo precisar de *comportamento* diferente — não só de número —, aí sim separar
+é o certo.
+
 ## Clamp, nunca wrap
 
 ⛔ O código atual **envolve** o ângulo em vez de saturá-lo:
