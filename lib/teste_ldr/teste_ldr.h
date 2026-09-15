@@ -18,6 +18,6 @@
    o main(). E o D-02 - antes cada rotina repetia as chamadas de init, e
    pwm_tpm_Init faz `tpm->SC |= ...`, um OR e nao uma escrita, entao
    reinicializar com parametros diferentes ACUMULA bits em vez de substituir. */
-int teste_ldr(void);
+int teste_ldr(int n);
 
 #endif /* TESTE_LDR_H */

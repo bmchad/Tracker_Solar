@@ -27,7 +27,7 @@
 
 /* Gira devagar num sentido por 1 s, para 1 s, gira no outro, para. NAO RETORNA.
    O mais cru dos tres: responde "o servo se mexe?" e nada mais. */
-void teste_rot_cont(void);
+void teste_rot_cont(int n);
 
 /* ⭐ RITUAL DE MEDICAO DE OMEGA - o numero de que a odometria da camada de servo
    depende. Gira 5 s num sentido, para 8 s para voce marcar e medir, e repete
@@ -36,7 +36,7 @@ void teste_rot_cont(void);
    O LED diz o que esta acontecendo, porque a serial pode estar muda:
        LED ACESO   -> GIRANDO (nao meca agora)
        LED APAGADO -> parado: marque a posicao, ou meca o varrido */
-void teste_rot_cont_medir_omega(void);
+void teste_rot_cont_medir_omega(int n);
 
 /* Varre o eixo pela CAMADA DE SERVO: 0 -> limite superior -> 0 -> limite
    inferior -> 0, com 1 s parado entre varreduras. Retorna ao fim.

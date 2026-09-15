@@ -70,7 +70,7 @@ static void recibo(void)
     }
 }
 
-void teste_rot_cont(void)
+void teste_rot_cont(int n)
 {
     printk("\n=== TESTE DE ROTACAO CONTINUA ===\n");
     printk("Pulso = VELOCIDADE, nao angulo. Neutro=%u, passo=%u (%d%% da "
@@ -80,7 +80,7 @@ void teste_rot_cont(void)
 
     recibo();   /* pisca o LED: prova que esta gravacao chegou */
 
-    for (;;) {
+    for (int i=0; i<n; i++) {
         led(COR_DESTA_GRAVACAO);
         aplicar("sentido A, devagar",  CNV_SENTIDO_A);
         led(LED_APAGADO);
@@ -127,7 +127,7 @@ static void medir_um(const char *eixo, uint16_t canal,
            eixo, sentido, OMEGA_MS_GIRO / 1000);
 }
 
-void teste_rot_cont_medir_omega(void)
+void teste_rot_cont_medir_omega(int n)
 {
     printk("\n=== MEDICAO DE OMEGA (graus/s) ===\n");
     printk("LED ACESO = girando. LED APAGADO = marque ou meca.\n");
@@ -136,7 +136,7 @@ void teste_rot_cont_medir_omega(void)
 
     recibo();
 
-    for (;;) {
+    for (int i=0; i<n; i++) {
         medir_um("horizontal", CANAL_HORIZONTAL, "sentido A",
                  CNV_NEUTRO + OMEGA_PASSO);
         medir_um("horizontal", CANAL_HORIZONTAL, "sentido B",

@@ -159,7 +159,7 @@ int main(void){
        COR_DESTA_GRAVACAO em pisca_led.h a cada build. */
     led(COR_DESTA_GRAVACAO);
 
-    teste_console(0); //teste_console(0) testa infinitamente o console
+    teste_console(10); //teste_console(0) testa infinitamente o console
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
     pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
@@ -197,12 +197,11 @@ int main(void){
        Ordem util quando se quer medir: console (a serial vive?) -> omega (a
        odometria depende dele) -> posicao -> LDR. */
 
-    teste_console(0);              /* a serial vive? 0 = infinito, NAO RETORNA */
-    teste_rot_cont();              /* o servo gira? NAO RETORNA                */
-    teste_rot_cont_medir_omega();  /* quanto vale omega? NAO RETORNA           */
+    teste_rot_cont(5);              /* o servo gira? NAO RETORNA                */
+    teste_rot_cont_medir_omega(5);  /* quanto vale omega? NAO RETORNA           */
     teste_medicao_posicao_vertical();    /* odometria e limite, pela camada    */
     teste_medicao_posicao_horizontal();
-    teste_ldr();                   /* os 4 quadrantes e a soma de pares        */
+    teste_ldr(10);                   /* os 4 quadrantes e a soma de pares        */
 
     /* --- LACO DE TRACKING --------------------------------------------------
 

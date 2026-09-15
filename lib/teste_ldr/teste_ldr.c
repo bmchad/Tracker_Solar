@@ -7,7 +7,6 @@
    solar nem servo - e ate 2026-09-15 incluia os quatro, herdados por copia do
    antigo testes.c. */
 
-#define NUMERO_DE_TESTES 10
 #define PAUSA_MS        500
 
 /* ⭐ Qual quadrante esta mais claro e qual mais escuro.
@@ -27,7 +26,7 @@ static void extremos(const int32_t mv[LDR_COUNT], int *claro, int *escuro)
     }
 }
 
-int teste_ldr(void)
+int teste_ldr(int n)
 {
     printk("\n=== TESTE DOS 4 LDRs (arranjo em CRUZ) ===\n");
     printk("Cobrir UM sensor confere a pinagem; cobrir DOIS do mesmo lado\n");
@@ -40,7 +39,7 @@ int teste_ldr(void)
        encostadas, sem printk no meio. Quatro ldr_ler() com log entre eles
        mediriam quatro instantes diferentes (a serial a 115200 gasta ~3 ms por
        linha), e a diferenca entre quadrantes viraria em parte temporal. */
-    for (int i = 0; i < NUMERO_DE_TESTES; i++) {
+    for (int i = 0; i < n; i++) {
         int32_t mv[LDR_COUNT] = {0};
         int err = ldr_ler_todos(mv);
 
