@@ -6,11 +6,14 @@ ldr inferior esquerdo no ptb1
 ldr superior direito no ptb2
 ldr inferior direito no ptb3
 os quatro ldr sao ptb0..ptb3 = A0..A3, contiguos no header arduino
-em angulo_incidencia_solar.c preencha dia mes ano latitude etc
 em init_hora.c coloque hora, minuto segundo
 
 ANTES DE LIGAR, POSICIONE MANUALMENTE O TRACKER COM A PLACA
 PARALELA AO SOLO E ALINHADA COM O EQUADOR
+
+⚠️ A linha antiga "em angulo_incidencia_solar.c preencha dia mes ano latitude"
+saiu: com a DEC-13 o eixo horizontal ficou em malha fechada pura e calcular_theta()
+deixou de ser chamado. Ver o comentario no fim deste arquivo.
 
 */
 
@@ -20,7 +23,6 @@ PARALELA AO SOLO E ALINHADA COM O EQUADOR
 #include <pwm_z42.h>                // Biblioteca personalizada com funções de controle do TPM (Timer/PWM Module)
 #include <ldr.h>
 #include <init_hora.h>              // Biblioteca do relógio de software
-#include <angulo_incidencia_solar.h> // Biblioteca matemática para Zênite e Azimute
 #include <servo_motor.h>
 #include <teste_ldr.h>
 #include <pisca_led.h>
@@ -32,10 +34,121 @@ PARALELA AO SOLO E ALINHADA COM O EQUADOR
 // 1ms (0 graus) = 375 contagens.
 // 2ms (180 graus) = 750 contagens.
 #define TPM_MODULE 7500
-#define SLEEP_TIME_MS 1000
-#define INPUT_PORT DT_NODELABEL(gpiod)
-#define INPUT_PIN 20
 
+/* --- Constantes do laço de tracking ---------------------------------------- */
+
+#define AMOSTRAS          5   /* impar, para a mediana nao precisar de media   */
+
+#define MARGEM_MV        60   /* diferenca abaixo disto e ruido/nuvem         */
+
+#define PASSO_MS        200   /* passo fixo. graus = PASSO_MS * omega / 1000, */
+                              /* ou ~12 graus com omega = 60 graus/s          */
+
+/* ⛔ Passo abaixo do minimo da camada faria o tracker NUNCA mover, e em
+   silencio: mover() recusaria todo comando e devolveria 0 para sempre. Pega em
+   tempo de compilacao, que e onde este erro custa menos. */
+BUILD_ASSERT(PASSO_MS >= SERVO_MS_MIN,
+             "PASSO_MS abaixo de SERVO_MS_MIN: todo comando seria recusado");
+
+#define PERIODO_MS     1000   /* entre amostras, com o eixo parado            */
+#define ASSENTAMENTO_MS 300   /* depois de mover, antes de reler (DEC-11)     */
+#define NOITE_MS       5000
+
+/* ⭐ A MATRIZ DE MISTURA: o unico lugar do firmware que conhece a geometria
+   optica. Arranjo em CRUZ (`+`), entao cada quadrante e uma DIAGONAL e cada
+   eixo sai de uma SOMA DE PARES - e a "comparacao de pares" do controle, que
+   deixou de ser entre dois sensores e passou a ser entre dois LADOS.
+
+   Se a aleta voltar a ser um "X", cada sensor volta a apontar para uma direcao
+   e ISTO e a unica coisa que muda:
+       *erro_h = mv[ESQ]  - mv[DIR];
+       *erro_v = mv[CIMA] - mv[BAIXO];
+
+   O SINAL depende da topologia do divisor, e ela esta fechada (P-03, confirmada
+   na montagem em 2026-09-15): pull-down, 10 kOhm para GND e LDR para 3,3 V,
+   logo mais luz => mais tensao, e as duas contas valem como estao escritas.
+   Se a montagem virar pull-up, inverta as duas. */
+static void erros(const int32_t mv[LDR_COUNT], int32_t *erro_h, int32_t *erro_v)
+{
+    *erro_h = (mv[LDR_SUP_ESQ] + mv[LDR_INF_ESQ])
+            - (mv[LDR_SUP_DIR] + mv[LDR_INF_DIR]);
+
+    *erro_v = (mv[LDR_SUP_ESQ] + mv[LDR_SUP_DIR])
+            - (mv[LDR_INF_ESQ] + mv[LDR_INF_DIR]);
+}
+
+/* Mediana de AMOSTRAS valores, por ordenacao por insercao numa copia.
+
+   ⭐ Substitui o filtro de votacao quadratica (D-10), que comparava cada
+   amostra da esquerda com cada amostra da direita num produto cruzado 5x5.
+   Aquilo misturava a diferenca ESPACIAL (o que se quer medir) com a variacao
+   TEMPORAL de cada sensor (o que se quer filtrar); disparava com UM outlier,
+   apesar de imprimir "certeza absoluta"; e os dois contadores podiam passar do
+   limiar ao mesmo tempo, caso em que o `else if` escolhia um lado em silencio.
+
+   Com o erro ja misturado antes de entrar no buffer, as cinco amostras sao da
+   MESMA grandeza e a comparacao passa a ser so temporal. A mediana descarta o
+   outlier sem arrastar o resultado para o lado dele - que e o que uma media
+   faria - e devolve MAGNITUDE, que e o que o passo proporcional precisa. */
+static int32_t mediana(const int32_t v[AMOSTRAS])
+{
+    int32_t c[AMOSTRAS];
+
+    for (int i = 0; i < AMOSTRAS; i++) {
+        c[i] = v[i];
+    }
+
+    for (int i = 1; i < AMOSTRAS; i++) {
+        int32_t x = c[i];
+        int j = i - 1;
+
+        while (j >= 0 && c[j] > x) {
+            c[j + 1] = c[j];
+            j--;
+        }
+        c[j + 1] = x;
+    }
+
+    return c[AMOSTRAS / 2];
+}
+
+/* Decide o SENTIDO a partir do erro e anda o passo fixo. Devolve 1 se o eixo de
+   fato andou.
+
+   ⭐ Tres vias e nenhuma aritmetica: passou da margem para um lado, passou para
+   o outro, ou fica parado. E o desenho do codigo original - o que mudou e que a
+   unidade do passo virou TEMPO, porque o servo e de rotacao continua e o
+   comando real e duracao, nao angulo.
+
+   ⚠️ CONVENCAO DE SENTIDO: erro positivo significa "mais luz do lado
+   esquerdo/de cima", e o painel tem de girar PARA LA - aqui isso e
+   SERVO_ANTIHORARIO. Se na bancada um eixo FUGIR da luz em vez de segui-la,
+   quem corrige e a montagem daquele eixo: troque `+` por `-` no cnv_horario /
+   cnv_anti dele em sevo_motor.c, como o comentario do eixo_t ja prevê. Corrigir
+   aqui inverteria tambem o sinal de theta, e a odometria passaria a contar ao
+   contrario. */
+static int corrigir(const char *eixo, int32_t erro,
+                    uint32_t (*mover)(servo_dir_t, uint32_t))
+{
+    servo_dir_t dir;
+
+    if (erro > MARGEM_MV) {
+        dir = SERVO_ANTIHORARIO;
+    } else if (erro < -MARGEM_MV) {
+        dir = SERVO_HORARIO;
+    } else {
+        return 0;               /* dentro da margem: nao mexe */
+    }
+
+    uint32_t aplicado = mover(dir, PASSO_MS);
+
+    printk("[track] %s: erro=%+d mV -> %s (aplicado %u ms)\n",
+           eixo, (int)erro,
+           (dir == SERVO_HORARIO) ? "horario" : "anti-horario",
+           (unsigned)aplicado);
+
+    return aplicado > 0;
+}
 
 //função principal
 int main(void){
@@ -43,15 +156,10 @@ int main(void){
     /* ⭐ RECIBO DE GRAVACAO, e e a PRIMEIRA coisa que main() faz de proposito:
        acende o LED na cor desta build e deixa aceso. Se a placa nao mudar de
        cor depois de gravar, o upload NAO chegou ao alvo - troque
-       COR_DESTA_GRAVACAO em pisca_led.h a cada build.
-
-       ⚠️ Vem ANTES de teste_console(), que e laco infinito: quando a serial
-       esta muda, o LED e a unica prova de que este firmware e o novo. Foi
-       exatamente essa duvida que custou o dia 2026-09-14 inteiro. */
+       COR_DESTA_GRAVACAO em pisca_led.h a cada build. */
     led(COR_DESTA_GRAVACAO);
 
-    teste_console(0); //teste_console(tentaivas), onde tentativa = 0 é infinito
-
+    teste_console(0); //teste_console(0) testa infinitamente o console
     // Configura os motores
     pwm_tpm_Init(TPM0, TPM_PLLFLL, TPM_MODULE, TPM_CLK, PS_128, EDGE_PWM);
     pwm_tpm_Ch_Init(TPM0, 3, TPM_PWM_H, GPIOD, 3);
@@ -61,7 +169,7 @@ int main(void){
     printk("Iniciando Aplicacao de Monitoramento do LDR...\n");
 
     // Inicializa o hardware do ADC
-    
+
     if (ldr_inicializar() < 0)  //configura o ldr
     {
         printk("Falha critica na inicializacao do ADC. Parando.\n");
@@ -82,161 +190,134 @@ int main(void){
     servo_zerar_horizontal();
     servo_zerar_vertical();
 
-    /* ⚠️ TESTES DE BANCADA - ligue UM de cada vez.
+    /* ⛔ ESCOLHA UM MODO. Tudo aqui fica COMENTADO quando o tracker roda - os
+       quatro primeiros nunca devolvem o controle ou consomem minutos, e o laco
+       de tracking nunca comecaria.
 
-       teste_rot_cont() e teste_rot_cont_medir_omega() sao lacos INFINITOS e nao
-       devolvem o controle; o que vier depois deles nunca roda. As medicoes de
-       posicao e o teste de LDR retornam, entao podem ser encadeados.
+       Ordem util quando se quer medir: console (a serial vive?) -> omega (a
+       odometria depende dele) -> posicao -> LDR. */
 
-       Ordem util quando se quer os tres: medir omega primeiro (a odometria
-       depende dele), depois posicao, depois LDR. */
-
-    //teste_rot_cont();              /* o servo gira? NAO RETORNA              */
-    //teste_rot_cont_medir_omega();  /* quanto vale omega? NAO RETORNA         */
-
-    printk("Iniciando teste de medicao de posicionamento\n");
-    teste_medicao_posicao_vertical();
+    teste_console(0);              /* a serial vive? 0 = infinito, NAO RETORNA */
+    teste_rot_cont();              /* o servo gira? NAO RETORNA                */
+    teste_rot_cont_medir_omega();  /* quanto vale omega? NAO RETORNA           */
+    teste_medicao_posicao_vertical();    /* odometria e limite, pela camada    */
     teste_medicao_posicao_horizontal();
+    teste_ldr();                   /* os 4 quadrantes e a soma de pares        */
 
-    printk("Iniciando teste de LDR\n");
-    teste_ldr();
+    /* --- LACO DE TRACKING --------------------------------------------------
 
-    /* =====================================================================
-       ⛔ LACO DE TRACKING DESATIVADO EM 2026-09-15 - NAO E ABANDONO, E PORTE
-          PENDENTE. Ele nao LINKA: chama servo_horizontal_angulo_tempo() e
-          servo_vertical_angulo_tempo(), que deixaram de existir quando a camada
-          de servo passou a falar direcao + tempo (os servos sao de rotacao
-          continua e nao tem posicao).
+       Buffer circular de AMOSTRAS erros JA MISTURADOS, um vetor por eixo.
 
-       ⚠️ NAO escreva um wrapper `servo_*_angulo_tempo` chamando a camada nova
-          para "resolver" isto. Seria exatamente a mentira que o refactor
-          removeu: prometer angulo a um dispositivo que so entende velocidade.
-          Foram dois dias de investigacao ate descobrir que era isso.
-
-       O QUE FALTA, quando for portar:
-         - `angulo += correcao` vira `servo_horizontal_direcao_tempo(dir, ms)`;
-         - o limite 10..170 sai: quem limita agora e a odometria, com +-120;
-         - `calcular_theta()` como POSICAO do vertical continua sendo o D-11, e
-           com rotacao continua nem posicao existe para mandar;
-         - `ldr_ler('d'/'e')` virou ldr_ler_todos() com quatro quadrantes em
-           cruz, e a mistura e soma de pares.
-       ===================================================================== */
-#if 0
-    /* Variaveis do controle antigo: 2 LDRs e servo POSICIONAL. Vivem aqui
-       dentro porque so este laco as usa - fora do #if 0 viravam oito avisos de
-       variavel nao utilizada. D-35: `direcao` e atribuida e nunca lida. */
-    #define LDR_HISTORY_SIZE 5
-    int angulo = 0, correcao = 10, theta = 0;
-    int direcao = 1;
+       ⚠️ Guardar o erro e nao as leituras cruas e o que fecha o D-10: cada
+       posicao do vetor e uma medida da mesma grandeza, tirada no mesmo
+       instante que as outras tres leituras daquele ciclo. O buffer antigo
+       guardava sensor por sensor, e o filtro entao comparava leituras de
+       instantes diferentes como se fossem posicoes diferentes. */
+    int32_t hist_h[AMOSTRAS] = {0};
+    int32_t hist_v[AMOSTRAS] = {0};
     int i = 0;
-    double valor_ldr_d[LDR_HISTORY_SIZE] = {0};
-    double valor_ldr_e[LDR_HISTORY_SIZE] = {0};
     int buffer_cheio = 0;
-    int contador_vertical = 0;
 
-    while(1){
-        relogio_atualizar(); // Mantém o relógio preciso atualizando as variáveis globais hora_atual, etc.
-        
+    while (1) {
+        relogio_atualizar(); // Mantém o relógio atualizando hora_atual, etc.
+
         // Lógica de Dia e Noite
         if (hora_atual >= 18 || hora_atual < 6) {
             printk("Fim de tarde! Painel indo dormir (Hora: %02d:%02d)...\n",
                    hora_atual, minuto_atual);
-            k_msleep(5000); // Dorme por 5 segundos antes de conferir o relógio de novo
-            continue; // Pula toda a lógica do LDR
-        }
-           //D-01: erro separado do valor. Antes, uma falha de leitura devolvia
-           //-1.0, entrava no historico e VOTAVA - o firmware concluia que o sol
-           //estava do lado oposto e movia a placa por causa de um erro de
-           //barramento. Agora o ciclo inteiro e descartado.
-        int32_t mv_d = 0, mv_e = 0;
-        int err_d = ldr_ler('d', &mv_d); // Le o LDR Direito
-        int err_e = ldr_ler('e', &mv_e); // Le o LDR Esquerdo
+            led(LED_APAGADO);
 
-        if (err_d < 0 || err_e < 0) {
-            printk("Falha na leitura do LDR (dir=%d esq=%d); ciclo descartado.\n",
-                   err_d, err_e);
-            k_msleep(1000);
+            /* ⚠️ Zera o historico junto: sem isto, o amanhecer decidiria com
+               cinco amostras do anoitecer - o sol do outro lado do ceu. */
+            i = 0;
+            buffer_cheio = 0;
+
+            k_msleep(NOITE_MS);
             continue;
         }
 
-        valor_ldr_d[i] = (double)mv_d;
-        valor_ldr_e[i] = (double)mv_e;
+        /* 1. LEITURA - uma chamada, quatro conversoes encostadas.
 
-        i++; 
-        if(i == LDR_HISTORY_SIZE) {
-            i = 0;
-            buffer_cheio = 1; // Temos LDR_HISTORY_SIZE leituras no historico!
+           D-01: erro e valor viajam por canais separados, e falha descarta o
+           CICLO INTEIRO. Antes uma falha devolvia -1.0, entrava no historico e
+           VOTAVA: o firmware concluia que o sol estava do lado oposto e movia a
+           placa por causa de um erro de barramento. */
+        int32_t mv[LDR_COUNT];
+
+        if (ldr_ler_todos(mv) < 0) {
+            led(LED_VERMELHO);
+            k_msleep(PERIODO_MS);
+            continue;
         }
-        #define certeza_parametro 5
-        if (buffer_cheio) {
-            int certeza_esquerda = 0;
-            int certeza_direita = 0;
-               // D-03: agora isto E milivolts de verdade. Antes o valor lido era
-               // contagem bruta escalada por um fator arbitrario, e esta "margem
-               //de millivolts" era adimensional - nao havia multimetro que a
-               //conferisse. O numero em si continua sendo chute ate as medicoes
-               //de P-04.
-            double margem = 20.0; // Tolerância em mV para ignorar ruído
-            
-            // Varredura no histórico para confirmar a decisão (Filtro Anti-Samba Quadrático)
-            for(int k = 0; k < LDR_HISTORY_SIZE; k++){
-                for(int j = 0; j < LDR_HISTORY_SIZE; j++){
-                    // Se a esquerda foi definitivamente MAIOR que a direita + margem, ganha 1 voto
-                    if(valor_ldr_e[k] > valor_ldr_d[j] + margem){
-                        certeza_esquerda++; // o sol está na esquerda
-                    }
-                    // Se a direita foi definitivamente MAIOR que a esquerda + margem, ganha 1 voto
-                    if(valor_ldr_d[k] > valor_ldr_e[j] + margem){
-                        certeza_direita++; // o sol está na direita
-                    }
-                }
-            }
 
-            int deve_mover = 0;
+        /* 2 e 3. ERRO POR SOMA DE PARES, direto para dentro do buffer. */
+        erros(mv, &hist_h[i], &hist_v[i]);
 
-            if (certeza_esquerda >= certeza_parametro) {
-                printk("Certeza absoluta: Sol na esquerda! Girando %d graus e indo para %d.\n", correcao, angulo+correcao);
-                angulo += correcao; // gira pra esquerda
-                deve_mover = 1;
-            } else if (certeza_direita >= certeza_parametro) {
-                printk("Certeza absoluta: Sol na direita! Girando %d graus e indo para %d.\n", correcao, angulo-correcao);
-                angulo -= correcao; // gira pra direita
-                deve_mover = 1;
-            } else {
-                // Não tem certeza (oscilação, nuvem ou luz equilibrada), fica parado!
-            }
+        i++;
+        if (i == AMOSTRAS) {
+            i = 0;
+            buffer_cheio = 1;
+        }
 
-            // Protecao dos limites do servo horizontal (0 a 180 graus)
-            if (angulo >= 170) {
-                angulo = 170;
-            } else if (angulo <= 10) {
-                angulo = 10;
-            }
+        if (!buffer_cheio) {
+            k_msleep(PERIODO_MS);
+            continue;           /* ainda enchendo: nao ha o que decidir */
+        }
 
-            // Se decidiu se mover, aplica o movimento e reseta o buffer
-            if (deve_mover && angulo <= 170 && angulo >= 10) {
-                servo_horizontal_angulo_tempo(angulo, 2);
-            }
-            
-            // Reseta o historico para comecar a avaliar a nova posicao (ou tentar de novo se ficou parado)
+        /* 4. DECISAO - uma mediana por eixo, e os dois sao independentes por
+           construcao. Nao existe mais o caso "as duas direcoes ganharam". */
+        int32_t erro_h = mediana(hist_h);
+        int32_t erro_v = mediana(hist_v);
+
+        /* 5. MOVIMENTO - os dois eixos a partir do MESMO instantaneo.
+
+           ⚠️ Girar em azimute mexe um pouco no erro vertical, entao o erro_v
+           usado aqui fica levemente velho depois do movimento horizontal. Nao
+           se corrige: o ciclo seguinte le de novo, e a malha absorve. Reler
+           entre os dois eixos custaria uma amostra tirada com o servo ainda
+           assentando, que e pior (DEC-11). */
+        int moveu = 0;
+
+        moveu |= corrigir("horizontal", erro_h, servo_horizontal_direcao_tempo);
+        moveu |= corrigir("vertical",   erro_v, servo_vertical_direcao_tempo);
+
+        /* 6. CADENCIA */
+        if (moveu) {
+            led(COR_DESTA_GRAVACAO);
+
+            /* ⭐ O historico descreve a posicao ANTIGA. Mantê-lo faria a
+               proxima decisao misturar cinco amostras de antes do movimento com
+               uma de depois - e a mediana de seis instantes em duas posicoes
+               diferentes nao mede nada. */
+            i = 0;
             buffer_cheio = 0;
-            i = 0;
-        }
 
-//aqui é ctrl c + ctrl v na lógica horizontal, e apagar a lógica com calcular theta
+            k_msleep(ASSENTAMENTO_MS);
+        } else {
+            led(LED_VERDE);     /* no alvo: erro abaixo do passo minimo */
 
-        if(contador_vertical == 0){
-        theta = calcular_theta((double)(hora_atual + minuto_atual/60.0 + segundo_atual/3600.0), angulo);
-        theta = arredondar_para_multiplo_de_5(theta);
-        servo_vertical_angulo_tempo((int)theta, 2); // lembrando que o servo não aceita mudanças suaves
-        k_msleep(200);
+            printk("[track] no alvo: erro_h=%+d erro_v=%+d mV | "
+                   "theta_h=%+d theta_v=%+d decimos de grau\n",
+                   (int)erro_h, (int)erro_v,
+                   (int)servo_theta_horizontal_d10(),
+                   (int)servo_theta_vertical_d10());
+
+            k_msleep(PERIODO_MS);
         }
-        contador_vertical++; if(contador_vertical == 300){
-            contador_vertical = 0;
-        }
-                k_msleep(1000);
     }
-#endif  /* laco de tracking desativado - ver o bloco acima */
+
+    /* ⚠️ DIVIDA REGISTRADA: lib/angulo_incidência_solar/ ficou SEM CHAMADOR.
+
+       calcular_theta(HL, gama_p) espera o azimute do painel, e com a DEC-13 o
+       eixo horizontal ficou em malha fechada pura - nao ha mapeamento de
+       azimute, logo nao ha gama_p para passar. Chamá-la com o theta RELATIVO da
+       odometria produziria um numero errado, e logar numero errado e pior que
+       nao logar. A biblioteca continua na arvore; o include dela saiu deste
+       arquivo pela regra do D-34 (incluir so o que se usa).
+
+       E o D-11 fecha aqui: theta era usado como POSICAO a comandar no vertical,
+       quando e funcao de custo - e com rotacao continua nem existe posicao para
+       mandar. */
 
     return 0;
 }

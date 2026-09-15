@@ -5,7 +5,7 @@ sintoma óbvio no log. É a categoria mais perigosa por isso.
 
 ---
 
-## D-10 — O filtro quadrático é incoerente com o que o próprio log afirma
+## D-10 — O filtro quadrático é incoerente com o que o próprio log afirma ✅ RESOLVIDO (2026-09-15)
 
 **Onde:** `src/main.c:98-130`.
 
@@ -36,12 +36,20 @@ Comparar cada amostra de um sensor com cada amostra do outro também mistura dua
 a diferença espacial (o que se quer medir) e a variação temporal de cada sensor (o que se quer
 filtrar). Um sensor oscilando sozinho gera "votos" nos dois lados.
 
-**Correção:** mediana de 5 por sensor, depois **uma** comparação por eixo. Spec em
+**Correção:** mediana de 5, depois **uma** comparação por eixo. Spec em
 [../02-software_specs/03-controle-4-quadrantes.md](../02-software_specs/03-controle-4-quadrantes.md).
+
+✅ **Feito no laço novo de `src/main.c`, e com uma diferença que vale registrar:** a spec pedia
+mediana **por sensor**, e o que entrou foi mediana **do erro já misturado**. É melhor, e é o que de
+fato mata a causa: o buffer passou a guardar `erro_h`/`erro_v` calculados no instante da leitura, em
+vez das leituras cruas. Assim as cinco posições do vetor são medidas da **mesma grandeza**, e a
+comparação vira puramente temporal — a mistura entre diferença espacial e variação temporal, que era
+o coração do bug, deixa de ser possível por construção. Uma mediana por eixo, `static int32_t
+mediana()`, ordenação por inserção de 5 elementos.
 
 ---
 
-## D-11 — θ (ângulo de incidência) usado como posição do servo vertical
+## D-11 — θ (ângulo de incidência) usado como posição do servo vertical ✅ RESOLVIDO (2026-09-15)
 
 **Onde:** `src/main.c:149-151`, com `lib/angulo_incidência_solar/angulo_incidencia_solar.c:17,34`.
 
@@ -67,9 +75,20 @@ A fórmula da eq. 9.15 em si está **correta** — foi conferida termo a termo c
 como diagnóstico. Spec em
 [../02-software_specs/04-eixo-vertical-feedforward.md](../02-software_specs/04-eixo-vertical-feedforward.md).
 
+✅ **Resolvido de forma mais simples que a spec previa, e por um motivo que a spec não podia saber:**
+com servo de **rotação contínua** não existe posição para comandar, então não há para onde mandar um
+feedforward. `calcular_theta()` saiu inteiro do caminho de comando, e o eixo vertical passou a ser
+**malha fechada pura**, a partir de `erro_v` — o mesmo código do horizontal, que é exatamente o que o
+comentário `//aqui é ctrl c + ctrl v na lógica horizontal` no laço antigo já pedia.
+
+⚠️ **Consequência a registrar:** `lib/angulo_incidência_solar/` ficou **sem chamador nenhum**. Não é
+descuido — com a **DEC-13** não há mapeamento de azimute, logo não existe `gama_p` para passar, e
+chamá-la com o θ relativo da odometria produziria um número errado. A biblioteca continua na árvore;
+o include saiu de `src/main.c` pela regra do **D-34**.
+
 ---
 
-## D-12 — Clamp antes do teste, e recomando no limite
+## D-12 — Clamp antes do teste, e recomando no limite ✅ RESOLVIDO (2026-09-15)
 
 **Onde:** `src/main.c:132-142`.
 
@@ -91,9 +110,14 @@ recomandado ao ângulo em que já está. Todo ciclo, para sempre, pagando os 2 s
 **Correção:** saturar, e mover só se a posição mudou. Ver
 [../02-software_specs/03-controle-4-quadrantes.md](../02-software_specs/03-controle-4-quadrantes.md).
 
+✅ **O clamp deixou de existir junto com a variável `angulo`.** Quem satura agora é a camada de
+servo, e ela satura a **duração**, não o ângulo: `ms_que_cabem()` corta o tempo pelo curso restante e
+devolve 0 quando não há mais. O controle checa `ms >= SERVO_MS_MIN` **antes** de chamar, então o
+recomando eterno no fim de curso não tem como acontecer — sem curso, não há comando.
+
 ---
 
-## D-13 — O modo noturno usa a variável do horizontal nos dois eixos
+## D-13 — O modo noturno usa a variável do horizontal nos dois eixos ⚠️ RESOLVIDO EM PARTE (2026-09-15)
 
 **Onde:** `src/main.c:79-89`.
 
@@ -120,6 +144,17 @@ Há ainda o efeito de borda com o clamp de **D-12**: durante o dia `angulo` é s
 E o limiar `>= 18 || < 6` é hora de calendário fixa: está errado em qualquer época do ano fora do
 equinócio. A elevação solar calculada já sabe quando o sol nasce naquela data e latitude — ver a
 spec do feedforward.
+
+⚠️ **O BUG saiu; a FUNCIONALIDADE saiu junto, e isso é uma escolha a revisitar.** No laço novo a
+variável `angulo` não existe mais, cada eixo tem seu próprio erro e sua própria odometria, então a
+guarda não tem como consultar o eixo errado. Mas o ramo noturno agora **só dorme**: não recolhe
+nenhum dos dois eixos. O painel passa a noite onde o dia terminou.
+
+⭐ **Recolher voltou a ser possível, e barato,** porque a odometria existe: comandar cada eixo no
+sentido que aproxima `servo_theta_*_d10()` de zero, até cruzar. Ficou de fora do porte para manter a
+mudança focada no laço de controle.
+
+⛔ **O que continua aberto sem mudança:** o limiar `>= 18 || < 6` de hora fixa.
 
 ---
 
@@ -153,7 +188,7 @@ Também serializa os dois eixos, que são independentes e poderiam assentar em p
 
 ---
 
-## D-15 — `theta` é truncado **antes** de ser arredondado
+## D-15 — `theta` é truncado **antes** de ser arredondado ✅ RESOLVIDO (2026-09-15)
 
 **Onde:** `src/main.c:56,149-151`.
 
@@ -172,6 +207,11 @@ degradado — 42,7 vira 42, que arredonda para 40 em vez de 45.
 Baixa severidade porque o passo é de 5° e o servo tem folga maior que isso. Fica registrado porque é
 o mesmo padrão de **D-03**: uma conversão implícita silenciosa desfazendo o trabalho da linha
 seguinte.
+
+✅ **Resolvido por consequência do D-11**, e não por um conserto próprio: a truncagem só existia no
+caminho `calcular_theta() -> arredondar_para_multiplo_de_5() -> servo`, e esse caminho inteiro saiu
+do comando. Não há mais `double` virando `int` no controle — o laço novo trabalha com `int32_t` em
+milivolts e em décimos de grau, do sensor ao servo.
 
 ---
 

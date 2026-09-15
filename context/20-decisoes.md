@@ -311,7 +311,8 @@ não entra no escopo.
 **Rejeitado:** medir a aleta e derivar o ganho óptico e o ângulo de captura antes do bringup.
 
 **Motivo:** o número serviria para **prever** o ganho, e o ganho vai ser **medido** de qualquer
-forma no passo 1 do bringup, em mV por grau — que é a unidade que `GANHO_MV_POR_GRAU` consome.
+forma no passo 1 do bringup, em mV por grau. ⚠️ Esse número deixou de ter consumidor com a
+**DEC-17**: não há ganho a calibrar, porque a grandeza não é constante.
 Prever para depois medir é trabalho duplicado, e a previsão dependeria de suposições ópticas que a
 medida dispensa.
 
@@ -377,3 +378,39 @@ realimentar a porta USB do PC.
 que é o dono do assunto. **O que continua aberto:** o capacitor de reservatório (470–1000 µF) não
 existe na bancada, e a corrente real nunca foi medida — as duas coisas são a mesma medição, em série
 com a alimentação dos servos.
+
+---
+
+## DEC-17 — Passo FIXO, não proporcional ao erro
+
+**2026-09-15.** A correção do tracker é um **passo de tamanho fixo** (`PASSO_MS`), disparado quando o
+erro passa de uma **margem** (`MARGEM_MV`). Dois parâmetros, ajustáveis direto na bancada, cada um
+com significado observável: a margem decide *quando* mover, o passo decide *quanto*.
+
+⛔ **Rejeitado — passo proporcional ao erro**, que chegou a ser implementado e foi revertido no mesmo
+dia. Ele calculava a duração como `|erro| / MV_POR_MS`, onde `MV_POR_MS` derivava de um
+`GANHO_MV_POR_GRAU` — "quantos milivolts de erro valem um grau de desalinhamento".
+
+⭐ **O motivo é físico, e é definitivo: esse ganho não existe.** O erro em milivolts é a diferença
+entre somas de leituras de LDR, e ela escala com a **intensidade** da luz, não só com o ângulo. A
+mesma defasagem de 10° vale da ordem de 50 mV num amanhecer e 500 mV ao meio-dia. Um ganho fixo
+erraria por uma ordem de grandeza ao longo do dia — de manhã corrigiria quase nada, ao meio-dia
+passaria do ponto e oscilaria.
+
+⚠️ **E não era caso de medir melhor no bringup.** Isto é o que distingue esta decisão da **DEC-8**
+("não mexer nos fatores de calibração antes de medir"): lá havia um número certo, ainda não medido.
+Aqui **não há número certo a medir**, porque a grandeza não é constante. Um chute e uma medição
+seriam igualmente inválidos.
+
+⛔ **Rejeitado também — normalizar o erro pela soma dos quatro LDRs.** `erro / (soma dos quatro)` de
+fato cancela a intensidade e tornaria o proporcional viável. Foi recusado por **complexidade contra
+benefício**: acrescenta uma divisão, uma escala nova para calibrar e um caso de borda no escuro
+(soma perto de zero), tudo para substituir um passo fixo que já funciona e tem dois parâmetros
+óbvios. Fica registrado porque é a saída correta **se** um dia o passo fixo se mostrar insuficiente.
+
+⚠️ **O que o passo fixo herda, e é aceito:** a margem continua em milivolts, logo continua sendo
+sensível à intensidade — num dia nublado o tracker corrige menos vezes. É um modo de falha muito mais
+brando que errar o tamanho do passo, e é o comportamento do código original, que funcionava.
+
+**Não confundir com a DEC-3:** o filtro continua sendo **mediana de 5**. A reversão é sobre a
+magnitude da correção, não sobre como o erro é limpo antes de decidir.

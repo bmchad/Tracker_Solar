@@ -95,8 +95,11 @@
    sentido, entao acumula em vez de se cancelar. Por isso comando abaixo disto e
    RECUSADO (devolve 0) em vez de executado pela metade.
    Valor a medir: comandar 50, 100, 200 ms e ver de onde em diante o movimento
-   e proporcional ao tempo. */
-#define SERVO_MS_MIN             150
+   e proporcional ao tempo.
+
+   ⭐ O NUMERO mora em servo_motor.h, nao aqui: quem controla precisa dele para
+   nao pedir movimento que sera recusado. A explicacao fica deste lado, o valor
+   fica no header - um fato, um dono. */
 
 /* O modelo de omega so vale nesta faixa de tensao. Fora dela, a odometria passa
    a extrapolar sem base - e como ela protege o curso, extrapolar em silencio e
@@ -165,7 +168,8 @@ static uint32_t mover(eixo_t *e, servo_dir_t dir, uint32_t ms)
     /* Abaixo do minimo o movimento nao e proporcional, e a odometria mentiria.
        Recusar e mais honesto que executar mal. */
     if (ms < SERVO_MS_MIN) {
-        printk("Servo nao vai se mover pois %d e menor que o minimos de %d", (int)ms, (int)SERVO_MS_MIN);
+        printk("[servo] canal %u: %u ms abaixo do minimo de %u; recusado\n",
+               (unsigned)e->canal, (unsigned)ms, (unsigned)SERVO_MS_MIN);
         return 0;
     }
 

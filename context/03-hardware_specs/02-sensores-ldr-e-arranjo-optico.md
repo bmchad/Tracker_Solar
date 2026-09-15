@@ -51,7 +51,7 @@ cruz há **dois** sensores à esquerda, um em cima e um embaixo. O `enum ldr_id_
 `io-channels` no overlay **não** mudou; só os nomes e os comentários.
 
 ⚠️ **O erro tem o DOBRO da magnitude do arranjo em X**, porque cada lado é a soma de dois
-sensores. `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU` precisam ser reescalados na mesma proporção —
+sensores. `MARGEM_MV` precisa ser reescalada na mesma proporção —
 senão a zona morta efetiva vira metade e o tracker fica nervoso perto do alvo.
 
 É por isso que a spec de controle isola a mistura numa função única — ver
@@ -69,8 +69,7 @@ A altura da aleta em relação ao espaçamento dos sensores determina o comporta
 - **Aleta baixa / sensores afastados** → resposta suave e faixa larga, mas pouco contraste perto
   do equilíbrio: o erro no alvo fica da ordem do ruído, e é aí que nasce o zig-zag.
 
-Isso não é ajustável depois: é o que fixa a escala de `GANHO_MV_POR_GRAU` e `ZONA_MORTA_MV` na
-spec de controle. Por isso o primeiro passo do bringup é **medir os quatro valores em mV** com a
+Isso não é ajustável depois: é o que fixa a escala de `MARGEM_MV` na spec de controle. Por isso o primeiro passo do bringup é **medir os quatro valores em mV** com a
 placa travada à mão, antes de qualquer motor girar — ver
 [../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md).
 
@@ -123,7 +122,7 @@ opera:
 
 ⭐ **A faixa útil está no terço de baixo da escala, e ainda assim sobra resolução de sobra:** 900 mV
 de excursão com 12 bits sobre 3,3 V (1 LSB ≈ 0,81 mV) são **~1100 contagens**, e a
-`ZONA_MORTA_MV = 30` fica em ~3% disso. Não há motivo para trocar o resistor por causa da escala.
+`MARGEM_MV = 30` fica em ~3% disso. Não há motivo para trocar o resistor por causa da escala.
 
 ⚠️ **Mas a medida é do ambiente em que foi feita.** R do LDR entre 23 kΩ e 320 kΩ é luz de interior;
 sol direto leva o LDR para a casa de 1 kΩ, e aí o divisor entrega ~3,0 V nos quatro. Isso não satura
@@ -133,7 +132,7 @@ todos acima de ~3 V, quem desce é o resistor (1–2,2 kΩ), e as contas desta s
 
 ⛔ **O que a faixa NÃO dá, e continua saindo só do passo 1 do bringup:** o **piso de ruído** com a
 placa parada no alvo, o **espalhamento entre os quatro** na sombra e o **mV por grau**. Não são
-pendência — são medição de bringup, e é o que mantém `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU`
+pendência — são medição de bringup, e é o que mantém `MARGEM_MV`
 marcados como chute inicial na spec de controle.
 
 ## Topologia de ligação — decidida (DEC-10)
@@ -188,12 +187,12 @@ Os quatro resistores fixos devem ser do mesmo lote, de preferência medidos. Em 
 
 > **1% de descasamento ≈ 8 mV** de offset estático
 
-Comparável à `ZONA_MORTA_MV` da spec de controle. Some-se a dispersão dos próprios LDRs, na seção
+Comparável à `MARGEM_MV` da spec de controle. Some-se a dispersão dos próprios LDRs, na seção
 abaixo, que é maior.
 
 ⛔ **A quarta faixa é OURO: os resistores são de 5%, e é isso que domina o erro de casamento.** Dois
 deles em extremos opostos da tolerância descasam **10%**, o que por esta mesma conta dá **~80 mV**
-de offset estático — quase **três vezes** a `ZONA_MORTA_MV = 30`. E no pior sentido possível: um "o
+de offset estático — quase **três vezes** a `MARGEM_MV = 30`. E no pior sentido possível: um "o
 sol está daquele lado" permanente, que o controle persegue com passo proporcional até o fim de
 curso.
 

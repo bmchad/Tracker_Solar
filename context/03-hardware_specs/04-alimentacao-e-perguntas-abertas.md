@@ -115,8 +115,8 @@ aberto): [02-sensores-ldr-e-arranjo-optico.md](02-sensores-ldr-e-arranjo-optico.
 entregue".
 
 ⚠️ **O que sobra não é pergunta, é medição de bringup:** piso de ruído no alvo, espalhamento entre
-os quatro na sombra, e mV por grau. São os três números que calibram `ZONA_MORTA_MV` e
-`GANHO_MV_POR_GRAU`, e só saem do passo 1 de
+os quatro na sombra, e mV por grau. São os três números que calibram `MARGEM_MV` e
+o passo fixo (**DEC-17**), e só saem do passo 1 de
 [../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md), com a
 placa travada à mão. Até lá as constantes da spec de controle continuam marcadas como chute
 inicial.

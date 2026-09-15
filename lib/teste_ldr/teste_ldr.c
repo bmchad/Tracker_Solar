@@ -60,8 +60,8 @@ int teste_ldr(void)
            enxergar.
 
            ⚠️ O erro tem o DOBRO da magnitude do arranjo em X - sao dois sensores
-           somados de cada lado. ZONA_MORTA_MV e GANHO_MV_POR_GRAU ja foram
-           reescalados na mesma proporcao. */
+           somados de cada lado. MARGEM_MV, em main.c, ja foi reescalada na
+           mesma proporcao. */
         int32_t esq   = mv[LDR_SUP_ESQ] + mv[LDR_INF_ESQ];
         int32_t dir   = mv[LDR_SUP_DIR] + mv[LDR_INF_DIR];
         int32_t cima  = mv[LDR_SUP_ESQ] + mv[LDR_SUP_DIR];

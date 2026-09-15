@@ -76,14 +76,18 @@ O que se confirma aqui, e só aqui:
 3. **Casamento dos quatro** — com os quatro na sombra, os valores têm de ser próximos. O
    espalhamento aqui é um erro **constante** que o controle vai ler como "o sol está daquele lado"
    para sempre.
-4. **As medições que calibram `ZONA_MORTA_MV` e `GANHO_MV_POR_GRAU`.** **P-04** já deu a faixa
-   (10²–10³ mV, ver
+4. **A medição que calibra `MARGEM_MV`.** **P-04** já deu a faixa (10²–10³ mV, ver
    [../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md](../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md)) —
-   o que **só** sai daqui é o piso de ruído no alvo, o espalhamento entre os quatro na sombra e o mV
-   por grau.
+   o que **só** sai daqui é o **piso de ruído no alvo** e o **espalhamento entre os quatro na
+   sombra**.
+
+   ⛔ **O "mV por grau" saiu do roteiro (DEC-17).** Ele calibraria um passo proporcional, e esse
+   desenho foi revertido: o erro em milivolts escala com a **intensidade** da luz, não só com o
+   ângulo, então não há número constante a medir. Medi-lo daria um valor válido só para o brilho
+   daquele momento.
 
 ⭐ Deixar rodando 1 minuto com a placa parada: a **variação** dos valores é o piso de ruído, e
-`ZONA_MORTA_MV` tem de ficar acima dele. Este é o número que decide se haverá zig-zag.
+`MARGEM_MV` tem de ficar acima dele. Este é o número que decide se haverá zig-zag.
 
 ### Passo 2 — os servos, sem sensores
 
@@ -122,8 +126,9 @@ subtração o cancela — vai direto para fonte externa.
 Só o horizontal, com o vertical travado. Lanterna movida à mão na horizontal. O que se observa:
 
 - a placa **segue** (se fugir, sinal invertido — passo 1 deixou passar);
-- ela **para** quando a luz para (se oscilar, `ZONA_MORTA_MV` está abaixo do ruído);
-- ela **assenta** sem passar do ponto (se passar, `GANHO_MV_POR_GRAU` está pequeno demais).
+- ela **para** quando a luz para (se oscilar, `MARGEM_MV` está abaixo do ruído);
+- ela **assenta** sem passar do ponto (se passar, `PASSO_MS` está grande demais — o passo é fixo,
+  então quem decide o quanto ela anda por correção é só ele).
 
 Depois o vertical, sozinho, do mesmo jeito.
 

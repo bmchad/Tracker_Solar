@@ -1,7 +1,17 @@
 # Controle de 4 quadrantes
 
-Arquivos: `lib/controle/controle.c`, `lib/controle/controle.h` (novos), e a remoção do bloco
-inline de `src/main.c:98-147`.
+⭐ **IMPLEMENTADO EM 2026-09-15, e mora em `src/main.c`, não em `lib/controle/`.** O módulo puro
+continua sendo o destino, e a seção "A interface do módulo" no fim continua valendo como alvo — mas
+extrair para biblioteca algo que nunca rodou uma vez é prematuro neste projeto, onde a bancada já
+contradisse a spec duas vezes (o arranjo em X da **DEC-1** e o servo posicional). A mistura
+(`erros()`), a mediana (`mediana()`) e a tradução de erro em comando (`corrigir()`) são `static` no
+topo de `main.c`; extrair depois é mecânico.
+
+⚠️ **Três seções abaixo descrevem um desenho que a rotação contínua tornou impossível** — a de passo
+proporcional foi reescrita, e as de `servo_saturar()`/`servo_ir()` e da interface do módulo falam de
+uma camada posicional que não existe. Leia-as como raciocínio, não como contrato.
+
+Arquivos: `src/main.c` (hoje), `lib/controle/` (alvo).
 
 ⚠️ Implemente [05-camada-servo-e-calibracao.md](05-camada-servo-e-calibracao.md) **antes** desta
 spec: enquanto cada comando de servo bloquear 1–2 s dentro do laço (**D-14**), o período de
@@ -77,37 +87,44 @@ O passo fixo de 10° de hoje (`correcao = 10`) tem os dois defeitos de qualquer 
 demais para recuperar um desalinhamento grande, grosso demais para assentar perto do alvo — e é
 assentar mal que produz zig-zag.
 
+⛔ **As quatro constantes viraram DUAS, e o passo continua FIXO — proporcional foi tentado e
+revertido no mesmo dia (DEC-17).** Com rotação contínua o comando é *direção + tempo*, então o passo
+se mede em milissegundos; o resto do desenho é o do código original.
+
 ```c
-/* ⚠️ Valores INICIAIS. Calibrar com as medições de P-04 antes de confiar.
-   ZONA_MORTA_MV tem de ficar ACIMA do ruído medido com a placa no alvo. */
-#define ZONA_MORTA_MV       60   /* abaixo disto é ruído/nuvem: não mexe */
-#define GANHO_MV_POR_GRAU   50   /* quantos mV de erro valem 1 grau de correção */
-#define PASSO_MIN_GRAUS      2   /* menor movimento que o servo faz de forma confiável */
-#define PASSO_MAX_GRAUS     15   /* teto: um salto grande é ou erro de leitura ou nuvem */
+#define MARGEM_MV        60   /* diferenca abaixo disto e ruido/nuvem         */
+#define PASSO_MS        200   /* passo fixo; graus = PASSO_MS * omega / 1000  */
+
+BUILD_ASSERT(PASSO_MS >= SERVO_MS_MIN, "todo comando seria recusado");
 ```
 
 ```c
-int passo = 0;
-if (abs(erro) > ZONA_MORTA_MV) {
-    passo = abs(erro) / GANHO_MV_POR_GRAU;
-    if (passo < PASSO_MIN_GRAUS) { passo = PASSO_MIN_GRAUS; }
-    if (passo > PASSO_MAX_GRAUS) { passo = PASSO_MAX_GRAUS; }
-    if (erro < 0) { passo = -passo; }
-}
+if      (erro >  MARGEM_MV) { dir = SERVO_ANTIHORARIO; }
+else if (erro < -MARGEM_MV) { dir = SERVO_HORARIO;     }
+else                        { return 0; }
 ```
 
-Cada constante existe por um motivo distinto:
+⛔ **Por que `GANHO_MV_POR_GRAU` saiu, e não volta:** o erro em milivolts escala com a
+**intensidade** da luz, não só com o ângulo — a mesma defasagem de 10° vale da ordem de 50 mV num
+amanhecer e 500 mV ao meio-dia. Não existe ganho fixo a calibrar, e medir no bringup não resolveria:
+não há número certo a medir. Raciocínio completo, com a alternativa que foi recusada junto
+(normalizar pela soma dos quatro LDRs), em [../20-decisoes.md](../20-decisoes.md) **DEC-17**.
 
-- **`ZONA_MORTA_MV`** é o que impede o zig-zag. Sem ela o sistema persegue ruído para sempre. Foi o
-  sintoma que o projeto anterior (o carrinho) nunca resolveu — o `README.MD` da raiz ainda o
-  descreve.
-- **`PASSO_MIN_GRAUS`** existe porque um MG90S comandado a 1° de distância pode simplesmente não
-  mover (folga da engrenagem), e o firmware então acredita que mexeu e não mexeu — sem encoder,
-  ninguém desmente.
-- **`PASSO_MAX_GRAUS`** limita o dano de uma leitura absurda. Combinado com a mediana, é a segunda
-  barreira contra um único valor esquisito virar movimento grande.
+As duas constantes que sobram fazem trabalhos distintos:
 
-⭐ `ZONA_MORTA_MV` só é calibrável porque `lib/ldr/` passou a devolver **milivolts de verdade** —
+- **`MARGEM_MV`** é o que impede o zig-zag por ruído. Tem de ficar **acima do piso de ruído** medido
+  com a placa parada no alvo — número que sai do passo 1 do bringup.
+- **`PASSO_MS`** é o tamanho da correção. `BUILD_ASSERT` garante que não caia abaixo de
+  `SERVO_MS_MIN`, o que faria a camada recusar todo comando **em silêncio**.
+
+⛔ **O zig-zag NÃO está resolvido por construção, e isso é honesto dizer.** Passo fixo de 200 ms são
+~12° com ω = 60 °/s; se 12° levarem o erro a passar da margem do outro lado, o tracker corrige de
+volta e oscila — exatamente o sintoma que o projeto anterior (o carrinho) nunca resolveu, e que o
+`README.MD` da raiz ainda descreve. A defesa é **empírica**, e é por isso que os dois parâmetros
+existem separados: subir `MARGEM_MV` até parar de vibrar, ou baixar `PASSO_MS` (com o piso do
+`BUILD_ASSERT`). Não dá para calcular o ponto, porque calcular exigiria o mV por grau que não existe.
+
+⭐ `MARGEM_MV` só é calibrável porque `lib/ldr/` passou a devolver **milivolts de verdade** —
 ver [02-api-ldr-4-sensores.md](02-api-ldr-4-sensores.md).
 
 ## Limites: clamp, e uma vez só

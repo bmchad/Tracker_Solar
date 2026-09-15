@@ -15,37 +15,54 @@ reduzida a uma função `led(cor)`) e `lib/teste_console/`.
 
 ---
 
-## 🎯 O PRÓXIMO PASSO: portar o `while` de `src/main.c`
+## ✅ O laço de tracking foi portado (2026-09-15)
 
-O laço de tracking está **desativado com `#if 0`**, com um bloco no código explicando o porquê. Ele
-**não linka**: chama `servo_horizontal_angulo_tempo()` e `servo_vertical_angulo_tempo()`, que
-deixaram de existir.
+`src/main.c` não tem mais `#if 0`: o tracker é código vivo, compila sem aviso, e fecha cinco dívidas
+(**D-10**, **D-11**, **D-12**, **D-15**, e **D-13** pela metade).
 
-⚠️ **NÃO escreva um wrapper `servo_*_angulo_tempo` chamando a camada nova.** Seria exatamente a
-mentira que o refactor removeu — prometer ângulo a um dispositivo que só entende velocidade. Foram
-dois dias de investigação até descobrir que era isso.
+A forma dele, em seis passos: `ldr_ler_todos()` numa chamada → erro por **soma de pares** → buffer
+circular de 5 **erros já misturados** → **mediana** por eixo → passo FIXO se o erro passar da margem
+→ move, zera o buffer e espera assentar.
 
-### O que precisa mudar, item a item
+⭐ **A decisão de desenho que vale entender antes de mexer:** o passo é **fixo**, não proporcional ao
+erro. Proporcional chegou a ser implementado e foi revertido no mesmo dia — o erro em milivolts
+escala com a **intensidade** da luz, não só com o ângulo, então não existe "mV por grau" a calibrar.
+Raciocínio completo em [20-decisoes.md](20-decisoes.md) **DEC-17**.
 
-| Hoje, no `#if 0` | Para onde vai |
-|---|---|
-| `angulo += correcao` e `servo_horizontal_angulo_tempo(angulo, 2)` | `servo_horizontal_direcao_tempo(SERVO_HORARIO ou SERVO_ANTIHORARIO, ms)` |
-| clamp `10..170` | **sai**: quem limita agora é a odometria, com ±120° (h) e ±50° (v), e a camada satura sozinha devolvendo menos ms |
-| `ldr_ler('d'/'e')` com dois sensores | `ldr_ler_todos(mv)` com quatro quadrantes, e **soma de pares** (arranjo em cruz) |
-| `calcular_theta()` como POSIÇÃO do vertical | continua sendo o **D-11**; e com rotação contínua nem existe posição para mandar |
-| filtro de votação quadrática | **D-10** — a spec pede mediana de 5 (DEC-3) |
+⚠️ **Dois parâmetros, os dois empíricos:** `MARGEM_MV = 60` (tem de ficar acima do piso de ruído) e
+`PASSO_MS = 200` (~12° com ω = 60 °/s). ⛔ **O zig-zag não está resolvido por construção:** se 12°
+levarem o erro a passar da margem do outro lado, o tracker oscila. Ajusta-se na bancada — sobe a
+margem, ou baixa o passo até o piso do `BUILD_ASSERT`.
 
-⭐ **A forma que o controle quer ter**, e que a camada já suporta:
+---
 
-```c
-if (erro_h > ZONA_MORTA_MV)  servo_horizontal_direcao_tempo(SERVO_HORARIO, ms);
-```
+## 🎯 O PRÓXIMO PASSO: a bancada, nesta ordem
 
-⛔ **E o obstáculo real, que decide o desenho:** o **passo mínimo**. `SERVO_MS_MIN = 150 ms` vezes ω
-dá o menor movimento possível — **9°** com a velocidade em 10%, **27°** em 30%. O sol anda 15°/h.
-Não dá para baixar a velocidade (zona morta) nem o tempo (movimento deixa de ser proporcional). As
-saídas são redução mecânica, aceitar passo grosso com zona morta maior que ele, ou servo posicional.
-**Isso não foi decidido.**
+Nada mais depende de código. Os quatro LDRs estão ligados (pull-down de 10 kΩ, confirmado na
+montagem), o laço está escrito, e daqui em diante o que falta são **medições** — cada uma
+desbloqueando a seguinte.
+
+1. ⚠️ **O servo se mexe?** `VELOCIDADE_PCT = 10` são 50 µs de desvio do neutro, e a zona morta típica
+   de rotação contínua é ±45 a ±90 µs. **Pode não girar.** Se não girar, suba o número em
+   `sevo_motor.c` — e **o primeiro valor em que ele anda é a zona morta medida**.
+   ⭐ Subir a velocidade não quebra nada no controle: ω muda, e `PASSO_MS` passa a valer mais graus.
+   Nenhum número precisa ser refeito — é a vantagem do passo fixo (**DEC-17**). Só a odometria se
+   importa, e ela já lê ω do `eixo_t`.
+2. **Medir ω**, quatro números (dois eixos × dois sentidos), com `teste_rot_cont_medir_omega()`.
+   Rotação contínua é assimétrica, e um ω só embute erro que **acumula** em vez de se cancelar.
+3. **Passo 1 do bringup**, agora possível: `teste_ldr()` com a placa parada. Saem o **piso de
+   ruído**, que é o que calibra `MARGEM_MV`, e o **espalhamento dos quatro na sombra** (o offset
+   estático dos resistores de 5 %, que com soma de pares se somam).
+4. **Teste do dedo:** cobrir um sensor confere a ordem de `io-channels` contra o enum — é o **único**
+   teste dela, e nada mais pega uma troca.
+5. **Malha fechada, com lanterna.** O eixo segue a luz? Para quando ela para? ⭐ E o teste que pega
+   oscilação: luz de frente, equilibrada, um minuto parado — o eixo tem de ficar **imóvel**, LED
+   verde.
+
+⛔ **O problema do passo mínimo continua sem decisão.** 9° é o menor movimento que existe
+(`SERVO_MS_MIN` × ω), e o sol anda 15°/h. Baixar `PASSO_MS` afina a correção até esse piso e não
+além — abaixo dele o `BUILD_ASSERT` barra o build. As saídas continuam sendo **redução mecânica** ou
+**servo posicional**.
 
 ---
 
@@ -74,8 +91,8 @@ menos do que prometem.**
 ### Os LDRs viraram arranjo em CRUZ
 
 Enum é `LDR_SUP_ESQ / SUP_DIR / INF_ESQ / INF_DIR` (os nomes antigos mentiam: `LDR_CIMA` era
-fisicamente o inferior esquerdo). Mistura por **soma de pares**, e `ZONA_MORTA_MV`/`GANHO_MV_POR_GRAU`
-foram reescalados ×2 porque o erro dobrou de magnitude. A **DEC-1** ficou revertida pelo hardware.
+fisicamente o inferior esquerdo). Mistura por **soma de pares**, e `MARGEM_MV` foi reescalada ×2
+porque o erro dobrou de magnitude. A **DEC-1** ficou revertida pelo hardware.
 
 ### Os quatro testes de bancada
 
@@ -93,16 +110,11 @@ seria medir a suposição.
 
 ---
 
-## Pendências de bancada, em ordem
+## Uma pendência de bancada que a lista acima não cobre
 
-1. ⚠️ **`VELOCIDADE_PCT` está em 10%** = 50 µs de desvio, e a zona morta típica é ±45 a ±90 µs. **O
-   servo pode simplesmente não girar.** Se não girar, suba o número — e o primeiro valor em que ele
-   anda **é a zona morta medida**;
-2. **medir ω**, quatro números, com `teste_rot_cont_medir_omega()`;
-3. **conferir a odometria**: na medição de posição, se o eixo não voltar ao ponto marcado, a
-   diferença é o erro acumulado;
-4. **teste do dedo** nos LDRs: cobrir um sensor confere a pinagem; cobrir dois do mesmo lado confere
-   a soma de pares.
+**Conferir a odometria:** na medição de posição (`teste_medicao_posicao_*`), se o eixo não voltar ao
+ponto marcado, a diferença **é** o erro acumulado. É a única evidência disponível de quanto ω ainda
+precisa ser medido — não há encoder que desminta a odometria de outro jeito.
 
 ## Armadilhas do ambiente que continuam valendo
 

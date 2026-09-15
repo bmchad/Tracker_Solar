@@ -29,6 +29,20 @@ typedef enum {
     SERVO_ANTIHORARIO    /* diminui theta */
 } servo_dir_t;
 
+/* ⭐ MENOR COMANDO QUE A CAMADA ACEITA, em milissegundos.
+
+   Vive no header, e nao no .c, porque QUEM CONTROLA precisa do numero: pedir
+   menos que isto e receber 0 de volta, entao o laco de controle checa antes em
+   vez de chamar e ser recusado. Repetir o numero la seria o mecanismo classico
+   da divergencia - a mesma razao pela qual OMEGA_PASSO em teste_rot_cont.c
+   deriva de PASSO_CNV em vez de copia-lo.
+
+   ⚠️ Multiplicado por omega, este numero E o PASSO MINIMO do eixo: nenhuma
+   correcao mais fina que ele existe. Com omega de 60 graus/s sao 9 graus, e e
+   esse piso que obriga o controle a ter zona morta maior que ele. Ver o .c
+   sobre por que comando curto demais mente para a odometria. */
+#define SERVO_MS_MIN   150
+
 /* Gira no sentido dado, em VELOCIDADE FIXA, por `ms` milissegundos, e para.
    Bloqueante.
 

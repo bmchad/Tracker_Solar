@@ -75,7 +75,7 @@ Três acoplamentos que não são visíveis no código e que quebram em silêncio
 |---|---|---|
 | **Ordem de `io-channels`** | `zephyr/frdm_kl25z.overlay` ↔ `enum ldr_id_t` em `lib/ldr/ldr.h` | os sensores trocam de nome; o tracker vira ao contrário sem erro nenhum |
 | **Sinal do erro** | topologia do divisor — pull-down, **P-03** fechada ↔ a mistura em `lib/controle/` | o painel foge do sol e para no batente |
-| **Unidade da leitura** | `lib/ldr/` devolve mV ↔ `ZONA_MORTA_MV` em `lib/controle/` | os limiares deixam de significar o que o nome diz — é o que acontece hoje, D-03 |
+| **Unidade da leitura** | `lib/ldr/` devolve mV ↔ `MARGEM_MV` em `lib/controle/` | os limiares deixam de significar o que o nome diz — é o que acontece hoje, D-03 |
 
 Cada um está documentado na spec do módulo dono, com um comentário no próprio código apontando
 para o outro lado.

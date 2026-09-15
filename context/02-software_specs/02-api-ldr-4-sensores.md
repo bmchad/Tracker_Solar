@@ -131,7 +131,7 @@ referência ou a resolução no devicetree corrige a conversão sozinho, em vez 
 empírico.
 
 ⭐ **É esta mudança que faz os limiares da spec de controle serem calibráveis com multímetro** —
-sem ela, `ZONA_MORTA_MV` continua sendo chute.
+sem ela, `MARGEM_MV` continua sendo chute.
 
 **Alternativa aceitável, se preferir não depender do overlay:** a conta à mão,
 `mv = (raw * 3300) / 4096`. Perde a vantagem de o devicetree ser a fonte da escala, mas não tem

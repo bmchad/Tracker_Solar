@@ -95,7 +95,7 @@ que parte dele seja **diferencial**.
 Os quatro LDRs estão em quatro pontos físicos distintos do trilho:
 
 > 1 A de pico do servo × ~50 mΩ entre dois LDRs = **50 mV diferenciais**, contra
-> `ZONA_MORTA_MV = 30`
+> `MARGEM_MV = 30`
 
 ⚠️ **Esses 50 mV são cálculo, não medida da sua bancada** — resistência típica de contato de
 protoboard é de dezenas de mΩ, e trilho gasto chega a ohms. A ordem de grandeza é o que importa: é
@@ -107,7 +107,7 @@ maior que a zona morta.
 degrau de corrente), estrela no GND com pinos de GND separados para servo e LDRs, e não amostrar
 durante o movimento.
 
-**Quando responder, tocar:** esta seção com a medida, e a `ZONA_MORTA_MV` em `lib/controle/`
+**Quando responder, tocar:** esta seção com a medida, e a `MARGEM_MV` em `lib/controle/`
 se sobrar resíduo que precise ser absorvido pelo limiar.
 
 ---
@@ -129,8 +129,8 @@ pedindo o teste do dedo, agora como **confirmação**: custa 30 s e é o que peg
 divergiu do que está escrito aqui.
 
 **O que continua aberto:** a faixa de mV, que é **P-04**. Os 10 kΩ fixam a meia escala (LDR =
-10 kΩ), não onde o LDR real opera — e é a faixa medida, não o resistor, que calibra `ZONA_MORTA_MV`
-e `GANHO_MV_POR_GRAU`.
+10 kΩ), não onde o LDR real opera — e é a faixa medida, não o resistor, que calibra `MARGEM_MV`
+e do passo fixo.
 
 ---
 
@@ -139,7 +139,7 @@ e `GANHO_MV_POR_GRAU`.
 **Resposta: ordem de 10² a 10³ mV** — de ~100 mV a ~1 V num fundo de escala de 3,3 V. Dono do fato:
 [../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md](../03-hardware_specs/02-sensores-ldr-e-arranjo-optico.md),
 seção "A faixa entregue", onde estão as consequências: o LDR opera entre ~23 kΩ e ~320 kΩ, sobram
-~1100 contagens de excursão (1 LSB ≈ 0,81 mV), e a `ZONA_MORTA_MV = 30` fica em ~3% da faixa.
+~1100 contagens de excursão (1 LSB ≈ 0,81 mV), e a `MARGEM_MV = 30` fica em ~3% da faixa.
 
 ⚠️ **A faixa foi levantada em luz de interior.** Ao sol o LDR cai para a casa de 1 kΩ e os quatro
 pinos sobem para ~3,0 V, onde a curva V(R) é quase plana e o contraste entre quadrantes comprime.
@@ -152,12 +152,13 @@ números, todos do passo 1, com a placa travada à mão:
 | Medir | Calibra |
 |---|---|
 | sombra total, e o **espalhamento** entre os quatro | o casamento dos sensores (erro constante) |
-| no alvo, e quanto **oscila** parado | ⭐ o piso de ruído → `ZONA_MORTA_MV` tem de ficar acima |
-| desequilíbrio de ~10° | `GANHO_MV_POR_GRAU` |
-| a partir de que ângulo um quadrante satura | a faixa em que o passo proporcional funciona |
+| no alvo, e quanto **oscila** parado | ⭐ o piso de ruído → `MARGEM_MV` tem de ficar acima |
+| desequilíbrio de ~10° | ⛔ nada — o passo é fixo (**DEC-17**), não há ganho a calibrar |
+| a partir de que ângulo um quadrante satura | até onde o erro ainda informa a **direção** |
 
 **Quando responder, tocar:** as quatro constantes em `lib/controle/controle.c` —
-`ZONA_MORTA_MV`, `GANHO_MV_POR_GRAU`, `PASSO_MIN_GRAUS`, `PASSO_MAX_GRAUS` — e a seção de
+`MARGEM_MV` e `PASSO_MS` (as outras duas que este parágrafo citava, `GANHO_MV_POR_GRAU` e
+`PASSO_MIN_GRAUS`, deixaram de existir com a **DEC-17**) — e a seção de
 calibração de
 [../02-software_specs/03-controle-4-quadrantes.md](../02-software_specs/03-controle-4-quadrantes.md),
 onde os valores atuais estão marcados como chute inicial.
