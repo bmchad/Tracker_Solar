@@ -45,7 +45,7 @@ typedef enum {
    ativo, e comentario que cita valor derivado envelhece a cada build. A conta e
    SERVO_MS_MIN * omega / 1000. Ver o .c sobre por que comando curto demais
    mente para a odometria. */
-#define SERVO_MS_MIN   10
+#define SERVO_MS_MIN   40
 
 /* Gira no sentido dado, em VELOCIDADE FIXA, por `ms` milissegundos, e para.
    Bloqueante.

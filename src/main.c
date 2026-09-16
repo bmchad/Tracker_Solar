@@ -49,7 +49,7 @@ deixou de ser chamado. Ver o comentario no fim deste arquivo.
    com omega saindo de VELOCIDADE_PCT em sevo_motor.c. ⚠️ O valor em graus NAO
    fica anotado aqui de proposito: este parametro esta em ajuste ativo, e
    comentario que cita valor derivado vira mentira no proximo build. */
-#define PASSO_MS        25
+#define PASSO_MS        50
 
 /* ⛔ Passo abaixo do minimo da camada faria o tracker NUNCA mover, e em
    silencio: mover() recusaria todo comando e devolveria 0 para sempre. Pega em

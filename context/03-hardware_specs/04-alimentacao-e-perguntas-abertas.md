@@ -68,7 +68,7 @@ do `P5V_USB`. A montagem está na seção abaixo.
 
    | Peça | Papel | Situação |
    |---|---|---|
-   | **470 nF** cerâmico | desacoplamento de **alta frequência**: mata a borda rápida do chaveamento da ponte H, que é o que se acopla nos fios analógicos dos LDRs (**P-10**) | ✅ na bancada — usar no lugar do 100 nF que a DEC-11 pedia, com pernas curtas |
+   | **470 nF** cerâmico | desacoplamento de **alta frequência**: mata a borda rápida do chaveamento da ponte H, que é o que se acopla nos fios analógicos dos LDRs (**P-10**) | ⭐ **INSTALADO em 2026-09-15**, em paralelo com os servos — no lugar do 100 nF que a DEC-11 pedia |
    | **470–1000 µF** eletrolítico (≥ 10 V) | **reservatório**: entrega o degrau de partida do motor sem puxá-lo pelo fio da fonte | ⚠️ **item de compra**, não existe |
 
    ⛔ **Os dois não se substituem, e a conta mostra a distância.** A corrente de partida dura
@@ -77,6 +77,34 @@ do `P5V_USB`. A montagem está na seção abaixo.
 
    Com a fonte externa de 2 A o eletrolítico deixa de ser crítico (a folga passa a vir da fonte),
    mas continua sendo o que suaviza o degrau na origem.
+
+   ### ⛔ O que o 470 nF NÃO conserta: a partida do motor
+
+   ⚠️ **É o erro natural a cometer aqui, e foi cometido em 2026-09-15** — o capacitor foi instalado
+   esperando "melhorar a inicialização do servo". Ele não melhora, por duas razões independentes:
+
+   1. **Ele não tem energia para isso**, pela conta acima: 235 ns de reserva contra um transiente de
+      milissegundos. Quem faria esse trabalho é o eletrolítico, que não existe na bancada.
+   2. ⭐ **E mais importante: a perda de partida não é elétrica, é INÉRCIA.** O motor e a caixa de
+      engrenagens levam um tempo fixo para acelerar, e é ele que o piso de proporcionalidade mede —
+      hoje conhecido, entre 25 e 50 ms de comando, por medição de bancada (ver
+      [../02-software_specs/06-bringup-e-testes.md](../02-software_specs/06-bringup-e-testes.md)).
+      **Nenhum capacitor move inércia.** Endurecer a alimentação só ajudaria se ela estivesse
+      afundando, e com a fonte externa de 2 A da **DEC-16** ela não é mais o termo dominante.
+
+   ⭐ **O que ele conserta de verdade é o P-10**, e isso é real: a borda de chaveamento da ponte H é
+   rápida, e é ela que se acopla capacitivamente nos fios analógicos dos LDRs. Manter instalado.
+
+   ⚠️ **Mas só funciona nos TERMINAIS DO SERVO, com pernas curtas** — e agora o porquê, para não
+   parecer capricho: desacoplamento de alta frequência num ponto distante é derrotado pela
+   **indutância do próprio fio**, que a essas frequências é impedância suficiente para isolar o
+   capacitor de onde ele deveria agir. 470 nF na protoboard, a 20 cm do motor, não filtra a borda que
+   veio filtrar.
+
+   ⭐ **Como saber se ele está fazendo efeito** — é o passo (c) do teste de 3 passos do bringup, e
+   não tem nada a ver com a partida: com `teste_ldr()` rodando e o servo **girando**, `erro_h` e
+   `erro_v` não devem se mexer. Se se mexerem, o acoplamento continua, e a perna do capacitor é o
+   primeiro suspeito.
 6. **Fios de servo longe dos analógicos dos LDRs**, sem trechos longos em paralelo (**P-10**).
 
 ⚠️ **Segurança:** é rede elétrica. Carregador de procedência, sem emenda exposta, e bancada

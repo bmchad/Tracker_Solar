@@ -59,10 +59,26 @@ desbloqueando a seguinte.
    oscilação: luz de frente, equilibrada, um minuto parado — o eixo tem de ficar **imóvel**, LED
    verde.
 
-⛔ **O problema do passo mínimo continua sem decisão.** 9° é o menor movimento que existe
-(`SERVO_MS_MIN` × ω), e o sol anda 15°/h. Baixar `PASSO_MS` afina a correção até esse piso e não
-além — abaixo dele o `BUILD_ASSERT` barra o build. As saídas continuam sendo **redução mecânica** ou
-**servo posicional**.
+## ✅ O problema do passo mínimo FECHOU, e por medição (2026-09-15)
+
+Ele era o obstáculo aberto desde o começo: o menor movimento possível é `SERVO_MS_MIN × ω`, e com o
+chute de 150 ms isso dava **12°** enquanto o sol anda 15°/h — grosso demais para acompanhar.
+
+⭐ **Mas 150 ms nunca foi medido, e o comentário dele no código pedia exatamente o experimento que
+faltava**: *"comandar 50, 100, 200 ms e ver de onde em diante o movimento é proporcional ao tempo"*.
+Foi feito na bancada, degrau a degrau: **100 ms funcionou, 50 ms funcionou, 25 ms não.** O piso real
+está entre 25 e 50 ms — cerca de **três vezes mais baixo** que o chute.
+
+⭐ **Consequência: a correção mais fina passou de 12° para ~3°.** O sol anda 15°/h, ou seja 3° a cada
+12 minutos: o tracker corrige cinco vezes por hora, com folga. As duas saídas que estavam na mesa —
+**redução mecânica** e **servo posicional** — deixaram de ser necessárias.
+
+⚠️ **O que continua verdade:** existe um piso, e abaixo dele o movimento deixa de ser proporcional ao
+tempo enquanto a odometria conta o que não aconteceu. É a mesma drift que produz o **limite falso**.
+O `BUILD_ASSERT` em `main.c` barra o build se `PASSO_MS` descer abaixo de `SERVO_MS_MIN`.
+
+⚠️ Os valores em vigor não ficam anotados aqui nem em comentário de código — eles estão em ajuste
+ativo, e o histórico de cada tentativa fica no log de bancada.
 
 ---
 
