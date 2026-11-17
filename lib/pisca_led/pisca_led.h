@@ -15,6 +15,9 @@ typedef enum {
     LED_VERDE = 0,   /* led0 - PTB19 */
     LED_AZUL,        /* led1 - PTD1  */
     LED_VERMELHO,    /* led2 - PTB18 */
+    LED_AMARELO,     /* nao e pino: vermelho + verde acesos juntos. As cores de
+                        um pino so ficam TODAS antes dela (BUILD_ASSERT em
+                        pisca_led.c). */
     LED_APAGADO,     /* nao e cor: apaga os tres. Sempre por ultimo. */
 } led_cor_t;
 
@@ -28,12 +31,13 @@ typedef enum {
    Uma linha so para editar, e a placa inteira muda de cor: e o que mantem o
    ritual barato o bastante para ser usado em vez de ignorado.
    Ver context/02-software_specs/06-bringup-e-testes.md. */
-#define COR_DESTA_GRAVACAO  LED_AZUL
+#define COR_DESTA_GRAVACAO  LED_VERDE
 
 /* Acende a cor e SEGURA - nao pisca, nao bloqueia, nao imprime.
 
-   Aciona os tres pinos em toda chamada: o escolhido aceso, os outros dois
-   apagados. Sem isso, trocar de cor deixaria a anterior acesa junto.
+   Aciona os tres pinos em toda chamada: os da cor acesos, os outros apagados.
+   Sem isso, trocar de cor deixaria a anterior acesa junto. LED_AMARELO acende
+   dois pinos (vermelho + verde); as outras cores, um.
 
    LED_APAGADO (ou qualquer valor invalido) apaga os tres.
 

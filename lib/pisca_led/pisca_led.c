@@ -11,15 +11,28 @@
 
    A ordem deste vetor E a ordem do enum led_cor_t - os indices designados
    existem para que a correspondencia fique escrita, nao implicita na posicao.
-   LED_APAGADO nao entra: ele nao e um pino, e a ausencia de todos. */
+   LED_AMARELO e LED_APAGADO nao entram: nao sao pinos. */
 static const struct gpio_dt_spec leds[] = {
     [LED_VERDE]    = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios),
     [LED_AZUL]     = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios),
     [LED_VERMELHO] = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios),
 };
 
-BUILD_ASSERT(ARRAY_SIZE(leds) == LED_APAGADO,
-             "o vetor de LEDs e o enum led_cor_t divergiram");
+BUILD_ASSERT(ARRAY_SIZE(leds) == LED_AMARELO,
+             "o vetor de LEDs e as cores de um pino so do enum divergiram");
+
+/* Quais pinos cada cor acende: um bit por indice de leds[]. O amarelo e a
+   unica mistura. LED_APAGADO fica de fora da tabela de proposito - e o que o
+   faz acender nada, junto com qualquer valor invalido. */
+static const uint8_t pinos_da_cor[] = {
+    [LED_VERDE]    = BIT(LED_VERDE),
+    [LED_AZUL]     = BIT(LED_AZUL),
+    [LED_VERMELHO] = BIT(LED_VERMELHO),
+    [LED_AMARELO]  = BIT(LED_VERMELHO) | BIT(LED_VERDE),
+};
+
+BUILD_ASSERT(ARRAY_SIZE(pinos_da_cor) == LED_APAGADO,
+             "falta cor na tabela pinos_da_cor");
 
 /* Configuracao PREGUICOSA, uma vez so.
 
@@ -64,11 +77,14 @@ void led(led_cor_t cor)
        esta" em vez de "acenda mais esta": sem apagar os outros dois, duas
        chamadas seguidas somariam cores.
 
-       Como o laco vai so ate ARRAY_SIZE(leds), LED_APAGADO - e qualquer valor
-       invalido - cai naturalmente em "nenhum aceso". Fail-safe de graca. */
+       Fora da tabela - LED_APAGADO e qualquer valor invalido - a mascara e 0
+       e cai em "nenhum aceso". Fail-safe de graca. */
+    const uint8_t acesos = ((unsigned)cor < ARRAY_SIZE(pinos_da_cor))
+                           ? pinos_da_cor[cor] : 0U;
+
     for (size_t i = 0; i < ARRAY_SIZE(leds); i++) {
         if (gpio_is_ready_dt(&leds[i])) {
-            gpio_pin_set_dt(&leds[i], (i == (size_t)cor) ? 1 : 0);
+            gpio_pin_set_dt(&leds[i], (acesos & BIT(i)) ? 1 : 0);
         }
     }
 }
