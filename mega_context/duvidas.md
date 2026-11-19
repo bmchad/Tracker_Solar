@@ -179,7 +179,8 @@ ERRADO", troque a constante. Registre o resultado aqui e em circuito.md.
 
 **Contexto.** O módulo ligado à placa tem duas entradas, IN1 e IN2, mas o circuito tem três relés. Uma
 possibilidade: este módulo de dois canais tem R2 e R3, com IN1 e IN2 ligados juntos ao SENTIDO (PTD2),
-e R1 fica em outro módulo, ligado ao LIGA (PTD4).
+e R1 fica em outro módulo, ligado ao LIGA (PTD4). ⭐ Em 2026-11-19: **a bancada tem só dois relés**
+(SRD-05VDC-SL-C). Se a ligação for a clássica da [rele.md](rele.md) §5, o terceiro não faz falta.
 
 **Por que importa.** Define para onde vai cada fio e se o pino SENTIDO aciona uma ou duas entradas
 (DV-02).
@@ -297,14 +298,17 @@ ativos em nível baixo, LIGA em PTD4 e SENTIDO em PTD2 (main_adr.md, ADR-01, 02 
 descrição de que R2 e R3 recebem o mesmo sinal. O teste da DV-01 mostrou que o módulo liga em nível
 **baixo**: a polaridade do código validado está invertida para ele.
 
-**Por que importa.** Com o motor parado, o código validado põe 0 V nos três pinos e deixa os três relés
-**ligados**. Se mesmo assim ele funcionou na bancada, o mais provável é que os fios do motor estejam nos
-bornes **NC** dos relés, compensando a inversão. Nessa ligação, **relé solto = motor energizado**: com a
-v1 gravada, com a placa em reset, com o USB desligado ou com o firmware travado.
+**Por que importa.** Com o motor parado, o código validado põe 0 V nos pinos e deixa os relés
+**acionados**. Ele pode ter funcionado assim por dois motivos, e só a fiação diz qual
+([rele.md](rele.md)):
+- **ligação clássica de dois relés** (rele.md §5): acionado/acionado também é parado, e andar é soltar
+  um relé. É **segura**, e combina com a bancada, que tem dois relés;
+- **algum NC no +12 V** (rele.md §6.3): com os relés soltos o motor gira, seja com a v1 gravada, com a
+  placa em reset, com o USB fora ou com o firmware travado. É **perigosa**.
 
-**Como resolver.** Ver em quais bornes (NO, COM, NC) estão os fios de potência de cada relé e passar para
-NO qualquer fio que esteja em NC. Depois, definir de vez se a bancada usa três sinais (avançar, recuar,
-habilitar) ou dois (LIGA, SENTIDO). Se forem três, a v1 se adapta.
+**Como resolver.** Preencher a tabela de bornes da rele.md §6.2 e ler o resultado pela §6.3. Se a
+ligação for a clássica, a v1 precisa ser adaptada para **um sinal por relé**, um para cada fio do
+motor, em vez de LIGA e SENTIDO.
 
 ### DV-19 · Quais os dois pontos de calibração do potenciômetro montado?
 

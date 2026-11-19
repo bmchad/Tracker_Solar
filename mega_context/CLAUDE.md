@@ -29,6 +29,7 @@ O repositório passou por duas fases, e cada uma tem a sua pasta de documentaç�
 | [info.md](info.md) | as peças do projeto, em poucas linhas | **sempre primeiro**: é a especificação de onde tudo parte |
 | [prompt.md](prompt.md) | o pedido original da área de elétrica/eletrônica | para entender por que [angulo.md](angulo.md) existe |
 | [circuito.md](circuito.md) | o circuito de potência: controladora, bateria, três relés | antes de mexer em fiação ou nos relés |
+| [rele.md](rele.md) | como o relé SRD-05VDC-SL-C funciona e como descobrir a ligação dos relés na protoboard | quem nunca mexeu com relé, antes de ler ou mudar a fiação |
 | [angulo.md](angulo.md) | como medir o ângulo: potenciômetro e acelerômetro | antes de mexer no sensor ou na calibração |
 | [main.md](main.md) | a **lógica** do firmware v1 e o roteiro para colocá-lo para rodar | antes de mexer no código |
 | [main_adr.md](main_adr.md) | as **decisões** do firmware (ADR-NN), com o motivo e o custo de cada uma | antes de desfazer algo que parece estranho no código |
