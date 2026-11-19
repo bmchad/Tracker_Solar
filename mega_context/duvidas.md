@@ -22,7 +22,7 @@ DV-NN são fixos: [main.md](main.md) e [main_adr.md](main_adr.md) citam por eles
 | DV-07 | Como ficam as chaves de fim de curso? | aberta | deixar o tracker funcionando sozinho |
 | DV-08 | Qual microcontrolador, pinos e alimentação ficam no projeto? | em parte | instalação em campo |
 | DV-09 | Qual sentido do motor sobe a placa? | aberta | o controle fechar a malha |
-| DV-10 | Quais relés ficam em IN1 e IN2, e onde está o terceiro? | aberta | ligar os fios dos relés |
+| DV-10 | Quais relés ficam em IN1 e IN2, e onde está o terceiro? | em parte | conferir os pinos da placa |
 | DV-11 | Qual a velocidade real do motor com carga? | aberta | ajustar as proteções |
 | DV-12 | Qual o curso mecânico do eixo? | aberta | definir curso e alvo da estrutura |
 | DV-13 | Qual microcontrolador e ADC no projeto real? | em parte | — |
@@ -30,7 +30,7 @@ DV-NN são fixos: [main.md](main.md) e [main_adr.md](main_adr.md) citam por eles
 | DV-15 | Potenciômetro ou acelerômetro? (experimento de bancada) | aberta | escolha definitiva do sensor |
 | DV-16 | Quanto tempo o motor leva para parar? | aberta | — (há folga) |
 | DV-17 | Quanto a placa anda depois de cortar o motor? | aberta | parar no alvo sem oscilar |
-| DV-18 | A fiação da bancada segue o código validado ou o circuito descrito? Os fios do motor estão em NO ou NC? | aberta | **usar a bancada com segurança** |
+| DV-18 | A linha do motor no R1 está no NO ou no NC? | aberta | **ligar a alimentação do motor com segurança** |
 | DV-19 | Quais os dois pontos de calibração do potenciômetro montado? | aberta | sair do modo calibração |
 | DV-20 | Como tirar o `platformio.ini` de cada máquina do git? | aberta | compilar em outra máquina sem editar |
 | DV-21 | O que fazer com as bibliotecas do protótipo em `lib/`? | aberta | — |
@@ -179,8 +179,12 @@ ERRADO", troque a constante. Registre o resultado aqui e em circuito.md.
 
 **Contexto.** O módulo ligado à placa tem duas entradas, IN1 e IN2, mas o circuito tem três relés. Uma
 possibilidade: este módulo de dois canais tem R2 e R3, com IN1 e IN2 ligados juntos ao SENTIDO (PTD2),
-e R1 fica em outro módulo, ligado ao LIGA (PTD4). ⭐ Em 2026-11-19: **a bancada tem só dois relés**
-(SRD-05VDC-SL-C). Se a ligação for a clássica da [rele.md](rele.md) §5, o terceiro não faz falta.
+e R1 fica em outro módulo, ligado ao LIGA (PTD4). ✅ **Confirmado em 2026-11-19:** a bancada tem **três
+relés em dois módulos** (SRD-05VDC-SL-C): R1 sozinho num módulo de um relé; R2 e R3 num módulo de dois,
+com os dois sinais ligados juntos ([rele.md](rele.md) §4).
+
+**O que ainda falta.** Em quais pinos da placa estão os dois sinais. A v1 espera LIGA no PTD4 (D2) e
+SENTIDO no PTD2 (D11).
 
 **Por que importa.** Define para onde vai cada fio e se o pino SENTIDO aciona uma ou duas entradas
 (DV-02).
@@ -298,17 +302,16 @@ ativos em nível baixo, LIGA em PTD4 e SENTIDO em PTD2 (main_adr.md, ADR-01, 02 
 descrição de que R2 e R3 recebem o mesmo sinal. O teste da DV-01 mostrou que o módulo liga em nível
 **baixo**: a polaridade do código validado está invertida para ele.
 
-**Por que importa.** Com o motor parado, o código validado põe 0 V nos pinos e deixa os relés
-**acionados**. Ele pode ter funcionado assim por dois motivos, e só a fiação diz qual
-([rele.md](rele.md)):
-- **ligação clássica de dois relés** (rele.md §5): acionado/acionado também é parado, e andar é soltar
-  um relé. É **segura**, e combina com a bancada, que tem dois relés;
-- **algum NC no +12 V** (rele.md §6.3): com os relés soltos o motor gira, seja com a v1 gravada, com a
-  placa em reset, com o USB fora ou com o firmware travado. É **perigosa**.
+**Por que importa.** A bancada tem os três relés do circuito descrito (DV-10): R1 e o par R2/R3 com um
+sinal só, o mesmo desenho da v1. Para parar o motor, o código validado põe 0 V nos pinos e, com estes
+módulos, **aciona todos os relés, R1 inclusive**. Se o motor ficava parado assim, a linha do motor no R1
+está no borne **NC**: a fiação compensa a polaridade invertida ([rele.md](rele.md) §7). Nessa ligação,
+**R1 solto = motor energizado**: com a placa desligada, em reset, com o USB fora, com o firmware travado
+ou com a v1 gravada.
 
-**Como resolver.** Preencher a tabela de bornes da rele.md §6.2 e ler o resultado pela §6.3. Se a
-ligação for a clássica, a v1 precisa ser adaptada para **um sinal por relé**, um para cada fio do
-motor, em vez de LIGA e SENTIDO.
+**Como resolver.** Conferir os bornes do R1 (rele.md §6.2). Se a linha estiver no NC, passar para o NO.
+A partir daí a v1 serve para a bancada como está, e o código validado só volta a ser gravado com o
+overlay dele trocado para nível baixo.
 
 ### DV-19 · Quais os dois pontos de calibração do potenciômetro montado?
 

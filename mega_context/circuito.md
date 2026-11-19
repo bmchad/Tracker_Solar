@@ -100,7 +100,7 @@ atualize os dois lugares.
 | 7 | **Fim de curso por hardware** ([angulo.md](angulo.md), seção 10) | Uma chave em série com R1 cortaria os dois sentidos e deixaria a placa presa no batente. A forma que funciona: uma chave normalmente fechada por ponta, na linha do motor, com um diodo em paralelo que deixa passar só o sentido que afasta do batente |
 | 8 | Microcontrolador, pinos e alimentação dele | Ainda não definido ([angulo.md](angulo.md), seção 9, item 3) |
 | 9 | Qual sentido (A ou B) **sobe** e qual **desce** a placa | Só dá para saber com a estrutura montada. Registre aqui quando souber |
-| 10 | Quais relés ficam em IN1 e IN2, e onde fica o terceiro | O módulo tem duas entradas e o circuito tem três relés. Falta saber se o terceiro relé fica em outro módulo, e qual entrada é LIGA e qual é SENTIDO |
+| 10 | ✅ **Em parte (2026-11-19): três relés em dois módulos.** R1 sozinho num módulo de um relé; R2 e R3 num módulo de dois, com os dois sinais ligados juntos ([rele.md](rele.md) §4) | Falta saber em quais pinos da placa estão os dois sinais (a v1 espera LIGA no PTD4 e SENTIDO no PTD2) |
 
 ---
 

@@ -1,6 +1,6 @@
 # Relé SRD-05VDC-SL-C: o mínimo para entender a bancada
 
-Escrito para responder **uma** pergunta (duvidas.md, DV-18): **como os dois relés da bancada estão
+Escrito para responder **uma** pergunta (duvidas.md, DV-18): **como os três relés da bancada estão
 ligados ao motor, e essa ligação é segura?** Não é um curso de relés: só o necessário para olhar a
 protoboard e saber.
 
@@ -61,50 +61,65 @@ ligam entre si.
 Na tampa costuma vir impresso algo como `10A 250VAC 10A 30VDC`. Para o motor, vale o número **em
 corrente contínua (VDC)**, e ele é para carga resistiva: motor puxa um pico maior na partida (DV-03).
 
-## 4. O módulo de dois relés
+## 4. Os dois módulos da bancada
 
-Os dois relés estão numa placa (o **módulo**). Para cada relé, ela tem a eletrônica que liga a bobina:
-um optoacoplador, um transistor, um diodo e um LED. Você não mexe nisso. O que importa são os dois
-conectores:
+A bancada tem **três relés em dois módulos** (2026-11-19). Cada relé vem montado num módulo, que tem a
+eletrônica que liga a bobina (optoacoplador, transistor, diodo e um LED). Você não mexe nisso.
 
-| Conector | Pinos | Liga em |
+| Módulo | Relés | Pinos de controle | Papel |
+|---|---|---|---|
+| módulo de 1 relé | **R1** | GND, sinal, 5V | liga / desliga |
+| módulo de 2 relés | **R2** e **R3** | GND, sinal, 5V para cada relé; **os dois sinais ligados juntos** | sentido |
+
+Cada relé tem **dois conectores**:
+
+| Conector | O que tem | Liga em |
 |---|---|---|
-| **Pinos macho** (controle) | VCC, GND, IN1, IN2 | a placa: VCC no 5V, GND no GND, IN1 e IN2 em pinos de sinal |
-| **Bornes de parafuso** (potência) | **três por relé**: NO, COM, NC | o motor e a alimentação de 12 V |
+| **Pinos de controle** | GND, sinal (IN), 5V | a placa |
+| **Bornes de parafuso** (potência) | **três**: NO, COM, NC | o motor e a alimentação de 12 V |
 
 ⚠️ A **ordem** dos três bornes muda de módulo para módulo. Leia o que está **escrito na placa** ao lado
 de cada borne, ou o desenho impresso perto dele.
 
-**Este módulo aciona o relé quando a entrada IN recebe GND** (teste de 2026-11-19, DV-01). Com IN em
-3,3 V, em 5 V ou solta, o relé fica solto, e o LED do canal acende quando o relé está acionado.
+**Estes módulos acionam o relé quando o sinal (IN) recebe GND** (teste de 2026-11-19, DV-01). Com o
+sinal em 3,3 V, em 5 V ou solto, o relé fica solto. O LED do canal acende com o relé acionado.
 
-## 5. Como dois relés invertem um motor (a ligação clássica)
+## 5. A ligação pretendida: R1 liga e desliga, R2 e R3 invertem
 
-É a ligação mais comum, e é a que tem mais chance de estar na bancada. Cada relé cuida de **um fio do
-motor**:
+É o circuito do [circuito.md](circuito.md). R1 fica no caminho do **GND**; R2 e R3 escolhem qual fio
+do motor recebe +12 V e qual recebe GND:
 
 ```
-          RELÉ 1                                        RELÉ 2
-   NO  ●──── +12 V                               NO  ●──── +12 V
-   COM ●─────────── M1 ══[ MOTOR ]══ M2 ──────────── ● COM
-   NC  ●──── GND                                 NC  ●──── GND
+ GND ───────── COM ● R1
+                   NO ●──────────────── "GND do R1" ──────┬───────────────────┐
+                   NC ●  (vazio)                           │                   │
+                                                           │                   │
+            R2                                             │        R3         │
+   NO  ●──── "GND do R1" ──────────────────────────────────┘   NC ●────────────┘
+   COM ●──── M1 ══════════════[ MOTOR ]═══════════════ M2 ──── COM ●
+   NC  ●──── +12 V                                             NO ●──── +12 V
 ```
 
-- **COM** de cada relé vai a um fio do motor (M1 e M2).
-- **NC** dos dois vai ao **GND** (o negativo).
-- **NO** dos dois vai ao **+12 V**.
+- **R1:** COM no GND, **NO** na linha que alimenta R2 e R3 ("GND do R1"), NC vazio.
+- **R2:** COM no fio M1 do motor, NC no +12 V, NO no "GND do R1".
+- **R3:** COM no fio M2, NC no "GND do R1", NO no +12 V. Os papéis de NO e NC são **cruzados** em
+  relação ao R2.
 
-| Relé 1 | Relé 2 | M1 recebe | M2 recebe | Motor |
+| R1 | R2 e R3 (juntos) | M1 recebe | M2 recebe | Motor |
 |---|---|---|---|---|
-| solto | solto | GND | GND | **parado** |
-| acionado | solto | +12 V | GND | gira num sentido |
-| solto | acionado | GND | +12 V | gira no outro |
-| acionado | acionado | +12 V | +12 V | **parado** |
+| **solto** | qualquer | sem GND | sem GND | **parado** |
+| acionado | soltos | +12 V | GND | gira num sentido |
+| acionado | acionados | GND | +12 V | gira no outro |
 
 ⭐ **Por que é segura:**
-- Com os dois soltos (placa desligada, em reset), os dois fios do motor ficam no GND: ele fica parado.
-- O +12 V nunca encontra o GND sem passar pelo motor, em nenhuma combinação. Não há curto possível.
-- Ela não precisa de um terceiro relé para parar: basta os dois relés ficarem iguais.
+- **Com R1 solto, o motor não tem GND e não gira.** É o estado com a placa desligada, em reset, com o
+  USB fora ou com o firmware travado.
+- R2 e R3 não comutam exatamente juntos. Nos poucos milissegundos em que um já trocou e o outro não, os
+  dois fios do motor ficam no mesmo potencial: o motor fica parado, sem curto.
+- O +12 V nunca encontra o GND sem passar pelo motor.
+
+⛔ **A única regra que decide a segurança: a linha do R1 tem de estar no NO.** Se estiver no NC, tudo se
+inverte: R1 solto passa a significar **motor energizado**.
 
 ## 6. Como descobrir a ligação da bancada
 
@@ -131,46 +146,41 @@ estão ligados. Faça isso **com tudo desligado**.
 
 ### 6.2 Preencher a tabela
 
-Com a alimentação do motor **desconectada** e o USB fora, siga o fio de cada borne e anote para onde ele
-vai: **M1** ou **M2** (um fio do motor), **+12 V**, **GND**, ou **nada**.
+Com a alimentação do motor **desconectada** e o USB fora, olhe os **bornes de parafuso** (não os pinos
+de controle) e anote para onde vai o fio de cada um: **M1** ou **M2** (um fio do motor), **+12 V**,
+**GND**, **o fio que vem do R1**, ou **nada**.
 
-| Borne | Relé do IN1 vai para | Relé do IN2 vai para |
-|---|---|---|
-| NO | | |
-| COM | | |
-| NC | | |
+| Borne | R1 (módulo de 1 relé) | R2 (módulo de 2, primeiro relé) | R3 (módulo de 2, segundo relé) |
+|---|---|---|---|
+| NO | | | |
+| COM | | | |
+| NC | | | |
 
 ### 6.3 Ler o resultado
 
-Para qualquer ligação, a regra da seção 2 diz o que o motor recebe: **solto → COM ligado a NC;
-acionado → COM ligado a NO.** Monte as quatro combinações (solto/solto, acionado/solto, solto/acionado,
-acionado/acionado) e confira três coisas:
-
-1. **Com os dois soltos, o motor tem de ficar parado.** Os dois fios dele recebem a mesma coisa (os dois
-   GND, ou os dois +12 V), ou ficam desligados. Se um recebe +12 V e o outro GND, **o motor gira sozinho
-   com a placa desligada**: essa é a ligação perigosa.
-2. **Em nenhuma combinação o +12 V pode encostar no GND sem passar pelo motor.** Isso é curto.
-3. **"Só um acionado" e "só o outro acionado" giram o motor em sentidos opostos.**
-
-Atalhos para os casos mais prováveis:
-
 | O que a tabela mostra | Conclusão |
 |---|---|
-| Igual à seção 5 (COM nos fios do motor, NC no GND, NO no +12 V, nos dois relés) | **ligação clássica: segura** |
-| COM nos fios do motor, mas **um NC no +12 V** e o outro no GND | **perigosa:** com os relés soltos o motor gira. Troque os fios de NO e NC desse relé |
-| **+12 V ou GND no COM** e o motor nos NO/NC | outra arquitetura (a do [circuito.md](circuito.md), que depende de um relé de liga/desliga): aplique a regra das quatro combinações |
+| **R1:** COM no GND (ou no +12 V) e **NO** no fio que vai para R2 e R3; NC vazio | R1 **seguro** |
+| **R1:** o fio que vai para R2 e R3 está no **NC** | ⛔ **perigoso:** com R1 solto o motor recebe energia. Passe esse fio do NC para o NO |
+| **R2 e R3:** COM nos fios do motor; o NC de um e o NO do outro no +12 V; os dois restantes no fio do R1 | inversão certa |
+| Alguma combinação liga o +12 V direto no GND, sem passar pelo motor | **curto**: não ligue a alimentação |
+
+Para conferir uma ligação diferente dessas, use a regra da seção 2 (**solto → COM no NC; acionado → COM
+no NO**) e veja o que cada fio do motor recebe em cada linha da tabela da seção 5.
 
 ## 7. O que isso explica sobre os dois códigos
 
-**Se** a bancada tiver a ligação clássica da seção 5:
+- **Código validado** (`!codigo_base/`): declara os relés como ativos em nível **alto**, o contrário
+  destes módulos. Para parar o motor ele põe 0 V em todos os pinos, e com estes módulos isso **aciona
+  todos os relés, R1 inclusive**. Se o motor ficava parado assim, a linha do motor no R1 está no **NC**:
+  acionar o R1 abre o NC e corta o motor. A fiação estaria compensando a polaridade invertida. O preço:
+  **com R1 solto** (placa desligada, em reset, USB fora, firmware travado, ou a v1 gravada) **o NC
+  fecha e o motor recebe energia**, girando no sentido de R2 e R3 soltos.
+- **v1:** nível baixo, a polaridade certa para estes módulos, e dois sinais (LIGA para R1, SENTIDO para
+  R2 e R3), que é o mesmo desenho da bancada. Parado = todos os relés soltos. **Ela só é segura com a
+  linha do R1 no NO.** Com isso, a v1 serve para a bancada como está; falta conferir os pinos: LIGA no
+  PTD4 (D2) e SENTIDO no PTD2 (D11).
 
-- **Código validado** (`!codigo_base/`, relés declarados como ativos em nível alto, o contrário deste
-  módulo): com o motor "parado", ele põe 0 V nos dois pinos e **aciona os dois relés**. Pela tabela da
-  seção 5, acionado/acionado também é parado (os dois fios em +12 V). Para andar, ele solta um dos
-  relés. **Por isso funcionou**, mesmo com a polaridade invertida. Os efeitos colaterais: as duas bobinas
-  ficam energizadas o tempo todo com o motor parado (~140 mA do 5V da placa), e os nomes "avançar" e
-  "recuar" ficam trocados. O pino de "habilitar" (PTD4) não aciona nada, porque não existe um terceiro
-  relé.
-- **v1** (nível baixo, a polaridade certa): parado = os dois soltos = os dois fios no GND. É seguro,
-  mas ela foi escrita para três relés (LIGA e SENTIDO) e só aciona o pino PTD2. Na ligação clássica,
-  isso move o motor **num sentido só**. Ela precisa ser adaptada a "um relé por fio do motor".
+⚠️ **Os dois códigos pedem fiações opostas no R1:** o validado precisa do NC, a v1 precisa do NO. Depois
+de passar o R1 para o NO, não grave mais o código validado sem antes trocar o overlay dele para nível
+baixo.
