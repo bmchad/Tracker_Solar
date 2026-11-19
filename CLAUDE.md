@@ -16,8 +16,13 @@ Este repositório guarda duas fases do mesmo projeto, e cada uma tem a sua pasta
 - O que está em `context/` **não vale para o projeto real** sem ser revalidado: microcontrolador,
   ADC, alimentação, constantes, decisões e bugs são do protótipo.
 
-## Escopo atual do projeto real (2026-11-09)
+## Escopo atual do projeto real (2026-11-19)
 
-Por enquanto, o **único** tema planejado em `mega_context/` é o **cálculo do ângulo da placa**
-(`mega_context/angulo.md`): potenciômetro e acelerômetro. Mecânica, orientação da estrutura,
-controle, alimentação e firmware do projeto real **não** são planejados até serem pedidos.
+Por enquanto, os temas planejados em `mega_context/` são:
+
+- o **cálculo do ângulo da placa** (`mega_context/angulo.md`): potenciômetro e acelerômetro;
+- o **circuito do motor** (`mega_context/circuito.md`): controladora, bateria e três relés. A
+  controladora é caixa-preta: carga e descarga da bateria não são planejadas.
+
+Mecânica, orientação da estrutura, controle e firmware do projeto real **não** são planejados até
+serem pedidos.
