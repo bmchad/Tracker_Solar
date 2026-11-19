@@ -86,6 +86,9 @@ item 3).
 
 ## 4. O que falta definir ou verificar
 
+Cada item tem uma cópia com contexto em [duvidas.md](duvidas.md) (DV-01 a DV-10). Ao resolver um,
+atualize os dois lugares.
+
 | # | O quê | Por que importa |
 |---|---|---|
 | 1 | ⚠️ **Em parte resolvido (2026-11-19): o GND é o sinal de controle.** A KL25Z liga no conector macho do módulo de relés, o lado das entradas IN1 e IN2. "Recebe GND" quer dizer: a entrada IN em 0 V aciona o relé (acionamento em nível baixo) | **Falta conferir:** com o módulo alimentado em 5 V, o nível alto de 3,3 V da KL25Z pode **não desligar** o relé, porque sobra ~1,7 V sobre o LED do optoacoplador e o resistor dele. Teste de bancada: IN no GND, o relé clica; IN no 3V3, o relé tem de soltar e o LED do canal apagar de vez. Se não soltar: jumper **JD-VCC** (VCC do lado do opto em 3,3 V, JD-VCC das bobinas em 5 V) ou um transistor por entrada. É isso que garante o repouso seguro da seção 2 |

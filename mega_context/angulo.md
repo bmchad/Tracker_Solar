@@ -425,6 +425,9 @@ comportamento sob vibração: os três números que fecham a seção 7 com medid
 
 ## 9. O que falta medir ou decidir (para o ângulo)
 
+Cada item tem uma cópia com contexto em [duvidas.md](duvidas.md) (DV-11 a DV-15). Ao resolver um,
+atualize os dois lugares.
+
 | # | O quê | Por que importa para o ângulo |
 |---|---|---|
 | 1 | rpm do motor na saída, com carga | define ω_eixo, a taxa de leitura do potenciômetro e quanto a placa anda depois de cortar o motor |
