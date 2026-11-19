@@ -237,7 +237,9 @@ Nesta ordem. Cada passo depende do anterior.
    clicar) e depois no 3V3 da placa (o relé tem de soltar e o LED do canal apagar de vez). Se não
    soltar, o firmware não consegue parar o motor (DV-01). **Não siga sem isso.**
 2. **Gravar e conferir o modo calibração.** Com `CALIBRACAO_MEDIDA = 0`: o LED fica amarelo e a serial
-   mostra N. Gire o potenciômetro de ponta a ponta: N tem de andar sem saltos.
+   mostra N. Gire o potenciômetro de ponta a ponta: N tem de andar sem saltos. Com o módulo de relés
+   ligado, **nenhum relé pode ligar**: nesse modo os pinos ficam em 3,3 V, e um relé ligado ou um LED de
+   canal aceso fraco é a falha da DV-01.
 3. **Calibrar.** Leve a placa a dois ângulos medidos (transferidor ou celular), anote N em cada um e
    preencha `calibracao`. Preencha também `ANGULO_MIN_D10`, `ANGULO_MAX_D10` e `ALVO_D10` com o curso
    real. Ponha `CALIBRACAO_MEDIDA = 1`, troque a cor do recibo e grave.

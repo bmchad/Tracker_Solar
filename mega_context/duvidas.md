@@ -50,17 +50,29 @@ o sentido. A placa (FRDM-KL25Z) comanda os relés pelo conector macho do módulo
 
 **Estado:** em parte resolvida · **Origem:** circuito.md §4, item 1
 
-**Contexto.** Já se sabe que o relé **liga quando a entrada IN recebe GND** (0 V). Para desligar, o pino
-da placa sobe para 3,3 V. Se o módulo for alimentado em 5 V, sobram ~1,7 V sobre o LED do
-optoacoplador e o resistor dele, e alguns módulos continuam ligados assim. Muitos desligam normalmente;
-só o teste diz.
+**Contexto.** Já se sabe duas coisas: o relé **liga quando a entrada IN recebe GND** (0 V), e o módulo
+está **alimentado pelo pino 5V da FRDM-KL25Z** (2026-11-19). Para desligar, o pino da placa sobe para
+3,3 V, e sobram ~1,4 a 1,7 V entre o VCC do módulo e a entrada IN, sobre o LED do optoacoplador e o
+resistor dele (o 5V que vem do USB costuma ficar entre 4,7 e 5 V). ⚠️ É justamente nessa ligação que
+alguns módulos **continuam ligados**. Muitos desligam normalmente; só o teste diz.
 
-**Por que importa.** Se R1 não soltar com 3,3 V, o firmware manda parar e o motor continua girando. É
-também o que garante que o motor fica parado no boot.
+**Por que importa.** Se R1 não soltar com 3,3 V, o firmware manda parar e o motor continua girando. E
+"relé solto" é o estado de repouso de toda a v1: modo calibração, parado e falha.
 
-**Como resolver.** Sem o motor: alimente o módulo, ligue IN no GND (o relé clica) e depois no 3V3 da
-placa (o relé tem de soltar e o LED do canal apagar de vez). Se não soltar: tire o jumper **JD-VCC**
-(VCC do lado do opto em 3,3 V, JD-VCC das bobinas em 5 V) ou use um transistor por entrada.
+**Como resolver.** Sem o motor ligado nos relés:
+1. **Teste com a própria v1.** Grave com `CALIBRACAO_MEDIDA = 0`. Nesse modo os dois pinos ficam o tempo
+   todo em 3,3 V (relé desligado). Se algum relé clicar, ou o LED de algum canal acender, mesmo fraco, o
+   módulo não desliga com 3,3 V.
+2. **O outro lado.** Tire o fio que liga uma entrada IN ao pino da placa e encoste essa entrada no GND:
+   o relé tem de clicar.
+
+Se o teste 1 falhar: com jumper **JD-VCC** no módulo, tire o jumper e ligue o VCC (lado do opto) no 3V3
+da placa e o JD-VCC (bobinas) no 5V; sem o jumper, use um transistor por entrada.
+
+**Consumo no 5V da placa.** Cada bobina de relé de 5 V puxa da ordem de 70 a 90 mA: com três relés
+acionados, ~0,25 A. Cabe no USB do computador (500 mA), mas em campo esse 5V tem de vir de outra fonte
+(DV-08). Vale olhar a coluna `ruido` da serial no momento em que os relés comutam: o 3,3 V do
+potenciômetro sai desse mesmo 5V.
 
 ### DV-02 · R2 e R3 recebem o mesmo sinal?
 
@@ -146,7 +158,8 @@ pela corrente do motor (DV-03).
 **Estado:** em parte · **Origem:** circuito.md §4, item 8
 
 **Contexto.** A v1 usa a **FRDM-KL25Z** com LIGA em PTD4 (D2), SENTIDO em PTD2 (D11) e o potenciômetro
-em PTC2 (A4) (main_adr.md, ADR-05). Hoje a placa é alimentada pelo USB do computador.
+em PTC2 (A4) (main_adr.md, ADR-05). Hoje a placa é alimentada pelo USB do computador, e o módulo de
+relés tira as bobinas do pino 5V dela (~0,25 A com três relés acionados, DV-01).
 
 **Falta decidir.** Se a KL25Z é a placa definitiva, e como ela é alimentada em campo: a partir da
 bateria/controladora, o que exige um regulador para 5 V, e com que consumo.
