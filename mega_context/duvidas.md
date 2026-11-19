@@ -13,7 +13,7 @@ DV-NN são fixos: [main.md](main.md) e [main_adr.md](main_adr.md) citam por eles
 
 | ID | Pergunta | Estado | O que fica travado sem a resposta |
 |---|---|---|---|
-| DV-01 | O relé desliga quando a placa manda 3,3 V? | em parte | ligar o motor com segurança |
+| DV-01 | O relé desliga quando a placa manda 3,3 V? | ✅ resolvida | — |
 | DV-02 | R2 e R3 recebem o mesmo sinal? | ✅ resolvida | — (resta a corrente do pino) |
 | DV-03 | O contato dos relés aguenta a corrente do motor? | aberta | ligar o motor com carga |
 | DV-04 | A saída da controladora aguenta o motor travado? | aberta | ligar o motor com carga |
@@ -30,7 +30,7 @@ DV-NN são fixos: [main.md](main.md) e [main_adr.md](main_adr.md) citam por eles
 | DV-15 | Potenciômetro ou acelerômetro? (experimento de bancada) | aberta | escolha definitiva do sensor |
 | DV-16 | Quanto tempo o motor leva para parar? | aberta | — (há folga) |
 | DV-17 | Quanto a placa anda depois de cortar o motor? | aberta | parar no alvo sem oscilar |
-| DV-18 | A fiação do laboratório segue o esboço ou o circuito descrito? | aberta | **gravar a v1 no laboratório** |
+| DV-18 | A fiação da bancada segue o código validado ou o circuito descrito? Os fios do motor estão em NO ou NC? | aberta | **usar a bancada com segurança** |
 | DV-19 | Quais os dois pontos de calibração do potenciômetro montado? | aberta | sair do modo calibração |
 | DV-20 | Como tirar o `platformio.ini` de cada máquina do git? | aberta | compilar em outra máquina sem editar |
 | DV-21 | O que fazer com as bibliotecas do protótipo em `lib/`? | aberta | — |
@@ -48,26 +48,20 @@ o sentido. A placa (FRDM-KL25Z) comanda os relés pelo conector macho do módulo
 
 ### DV-01 · O relé desliga quando a placa manda 3,3 V?
 
-**Estado:** em parte resolvida · **Origem:** circuito.md §4, item 1
+**Estado:** ✅ resolvida em 2026-11-19 · **Origem:** circuito.md §4, item 1
 
-**Contexto.** Já se sabe duas coisas: o relé **liga quando a entrada IN recebe GND** (0 V), e o módulo
-está **alimentado pelo pino 5V da FRDM-KL25Z** (2026-11-19). Para desligar, o pino da placa sobe para
-3,3 V, e sobram ~1,4 a 1,7 V entre o VCC do módulo e a entrada IN, sobre o LED do optoacoplador e o
-resistor dele (o 5V que vem do USB costuma ficar entre 4,7 e 5 V). ⚠️ É justamente nessa ligação que
-alguns módulos **continuam ligados**. Muitos desligam normalmente; só o teste diz.
+**Contexto.** O módulo de relés é alimentado pelo **pino 5V da FRDM-KL25Z**. Com o módulo nesse 5V e o
+pino da placa em 3,3 V, alguns módulos não desligam: sobram ~1,4 a 1,7 V sobre o LED do optoacoplador.
+Era preciso testar.
 
-**Por que importa.** Se R1 não soltar com 3,3 V, o firmware manda parar e o motor continua girando. E
-"relé solto" é o estado de repouso de toda a v1: modo calibração, parado e falha.
+**Resultado.** Com a entrada IN encostada à mão: **GND → o relé liga; 3V3 → não liga; 5V → não liga.**
+O módulo é acionado em **nível baixo**, e o nível alto de 3,3 V da placa basta para deixá-lo solto. Com
+a v1 gravada (pinos em 3,3 V), os LEDs dos relés ficam apagados, o que confirma o resultado. A
+polaridade da v1 (`GPIO_ACTIVE_LOW`, main_adr.md ADR-02) está certa.
 
-**Como resolver.** Sem o motor ligado nos relés:
-1. **Teste com a própria v1.** Grave com `CALIBRACAO_MEDIDA = 0`. Nesse modo os dois pinos ficam o tempo
-   todo em 3,3 V (relé desligado). Se algum relé clicar, ou o LED de algum canal acender, mesmo fraco, o
-   módulo não desliga com 3,3 V.
-2. **O outro lado.** Tire o fio que liga uma entrada IN ao pino da placa e encoste essa entrada no GND:
-   o relé tem de clicar.
-
-Se o teste 1 falhar: com jumper **JD-VCC** no módulo, tire o jumper e ligue o VCC (lado do opto) no 3V3
-da placa e o JD-VCC (bobinas) no 5V; sem o jumper, use um transistor por entrada.
+⚠️ **Consequência:** o overlay do código validado (`!codigo_base/boards/frdm_kl25z.overlay`) declara os
+relés como ativos em nível **alto**. Com este módulo, ele deixa os três relés **ligados** com o motor
+parado (DV-18).
 
 **Consumo no 5V da placa.** Cada bobina de relé de 5 V puxa da ordem de 70 a 90 mA: com três relés
 acionados, ~0,25 A. Cabe no USB do computador (500 mA), mas em campo esse 5V tem de vir de outra fonte
@@ -297,16 +291,20 @@ Pôr esse valor em `ANTECIPACAO_D10`, ou alargar `LIMIAR_PARTIDA_D10`.
 
 **Estado:** aberta · **Origem:** conflito entre o esboço (commit `79c8b99`) e a descrição do circuito
 
-**Contexto.** A sessão do laboratório escreveu um esboço com **três relés independentes ativos em nível
-alto**: avançar em PTD2, recuar em PTD3, habilitar em PTD4. Depois, o circuito foi descrito assim:
-**R1 liga com GND na entrada** e **R2 e R3 recebem o mesmo sinal**. A v1 segue a descrição: dois sinais
-ativos em nível baixo, LIGA em PTD4 e SENTIDO em PTD2 (main_adr.md, ADR-01, 02 e 05).
+**Contexto.** O código validado na bancada (`!codigo_base/`) usa **três sinais**: avançar em PTD2,
+recuar em PTD3 e habilitar em PTD4, declarados como ativos em nível **alto**. A v1 usa dois sinais
+ativos em nível baixo, LIGA em PTD4 e SENTIDO em PTD2 (main_adr.md, ADR-01, 02 e 05), seguindo a
+descrição de que R2 e R3 recebem o mesmo sinal. O teste da DV-01 mostrou que o módulo liga em nível
+**baixo**: a polaridade do código validado está invertida para ele.
 
-**Por que importa.** Se o laboratório estiver ligado como o esboço e os relés forem mesmo ativos em
-nível alto, a v1 **liga os relés no boot**.
+**Por que importa.** Com o motor parado, o código validado põe 0 V nos três pinos e deixa os três relés
+**ligados**. Se mesmo assim ele funcionou na bancada, o mais provável é que os fios do motor estejam nos
+bornes **NC** dos relés, compensando a inversão. Nessa ligação, **relé solto = motor energizado**: com a
+v1 gravada, com a placa em reset, com o USB desligado ou com o firmware travado.
 
-**Como resolver.** Antes de gravar a v1 no laboratório, conferir a fiação. Ou a fiação muda para a da
-v1 (o fio do PTD3 sai), ou o overlay e a biblioteca mudam para a fiação de lá.
+**Como resolver.** Ver em quais bornes (NO, COM, NC) estão os fios de potência de cada relé e passar para
+NO qualquer fio que esteja em NC. Depois, definir de vez se a bancada usa três sinais (avançar, recuar,
+habilitar) ou dois (LIGA, SENTIDO). Se forem três, a v1 se adapta.
 
 ### DV-19 · Quais os dois pontos de calibração do potenciômetro montado?
 
